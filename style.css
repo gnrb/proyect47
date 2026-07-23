@@ -14093,3 +14093,82 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         z-index: 100 !important;
     }
 }
+
+/* =====================================================
+   ✨ FIX ABSOLUTO: LETRAS CINEMATOGRÁFICAS Y TEXTO FINAL
+   ===================================================== */
+
+/* 1. Evitar que NINGÚN texto (como el P.D.) desborde la tarjeta de cristal */
+.final-letter-card p,
+.final-letter-card h2,
+.final-letter-card .final-ps,
+.final-letter-card .final-small {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* 2. Rediseño Total de las letras "She looks just like a dream" */
+.final-dream-lyrics {
+    position: fixed !important; /* Fixed al viewport, para que el scroll de la carta no lo mueva */
+    bottom: max(30px, env(safe-area-inset-bottom, 20px)) !important;
+    top: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(92vw, 650px) !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 9999 !important; /* Por encima de todo, sin estorbar atrás */
+    pointer-events: none !important;
+}
+
+/* El bloque de cada frase de la canción */
+.final-dream-line {
+    position: absolute !important;
+    top: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    
+    transform: translate(-50%, 15px) scale(0.95) !important;
+    text-align: center !important;
+    
+    padding: 14px 24px !important;
+    font-size: clamp(16px, 4vw, 24px) !important;
+    line-height: 1.3 !important;
+    white-space: pre-wrap !important;
+    
+    background: rgba(6, 9, 14, 0.88) !important;
+    border: 1px solid rgba(255, 230, 180, 0.25) !important;
+    border-radius: 16px !important;
+    
+    box-shadow: 
+        0 15px 35px rgba(0,0,0,0.85), 
+        0 0 25px rgba(255, 214, 120, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+        
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    
+    color: rgba(255, 245, 222, 0.96) !important;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9) !important;
+}
+
+/* Animación de entrada de los subtítulos */
+.final-dream-line.visible {
+    transform: translate(-50%, 0) scale(1) !important;
+}
+
+/* En celulares que estén horizontales, lo achicamos un poquitín para no tapar los botones */
+@media (orientation: landscape) and (max-height: 560px) {
+    .final-dream-lyrics {
+        bottom: max(15px, env(safe-area-inset-bottom, 10px)) !important;
+    }
+    .final-dream-line {
+        font-size: clamp(14px, 3vh, 18px) !important;
+        padding: 8px 16px !important;
+    }
+}
