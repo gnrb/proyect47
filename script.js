@@ -628,13 +628,22 @@ function dodgeNoButton(event, btn) {
 function acceptSmile() {
     const box = document.getElementById('smile-question-box');
     const answer = document.getElementById('smile-answer');
+    const noBtn = document.getElementById('smile-no-btn'); // Buscamos el botón ño
 
     if (!box || !answer) return;
 
     box.classList.remove('teasing');
     box.classList.add('accepted', 'smile-final-accepted');
 
-    answer.textContent = 'sabía que sí jsajs ';
+    answer.textContent = 'sabía que si jsajs ';
+
+    // FIX: Destruimos visualmente el botón "ño", esté donde esté
+    if (noBtn) {
+        noBtn.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+        noBtn.style.opacity = '0';
+        noBtn.style.transform = 'scale(0)';
+        noBtn.style.pointerEvents = 'none';
+    }
 
     showAchievement('¡Logro desbloqueado!', 'Le saqué una sonrisa', 5000, 'minecraft');
 }
@@ -717,14 +726,21 @@ function backToMenuFromFinal() {
     const smileBox = document.getElementById('smile-question-box');
     const smileAnswer = document.getElementById('smile-answer');
 
-    // Regresa el botón a la caja
+    // Regresa el botón a la caja y le devuelve la vida
     if (noBtn && optionsBox && noBtn.parentElement !== optionsBox) {
         noBtn.classList.remove('running-away');
         noBtn.style.left = '';
         noBtn.style.top = '';
         noBtn.style.width = '';
         noBtn.style.height = '';
+        noBtn.style.opacity = '1';
+        noBtn.style.transform = 'none';
+        noBtn.style.pointerEvents = 'auto';
         optionsBox.appendChild(noBtn);
+    } else if (noBtn) {
+        noBtn.style.opacity = '1';
+        noBtn.style.transform = 'none';
+        noBtn.style.pointerEvents = 'auto';
     }
     
     // Resetea los textos de la sonrisa
