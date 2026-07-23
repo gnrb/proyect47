@@ -13947,3 +13947,76 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         padding: 0 4px !important;
     }
 }
+
+/* =====================================================
+   🔥 PARCHE DEFINITIVO: S24 FE / MÓVIL HORIZONTAL
+   ===================================================== */
+@media (orientation: landscape) and (max-height: 600px) {
+    
+    /* ─── 1. ARREGLO MUNDO 2 (POLAROIDS) ─── */
+    /* Pasamos de usar 'vw' a 'vh' para que la letra no explote al girar la pantalla */
+    
+    #world-2 .polaroid {
+        top: 48% !important; /* Centramos las fotos un poco más arriba */
+        width: clamp(130px, 32vh, 180px) !important;
+        height: clamp(170px, 45vh, 250px) !important;
+    }
+
+    .polaroid-back .back-text {
+        font-size: clamp(11px, 4.5vh, 15px) !important; /* Letra estable */
+        line-height: 1.15 !important;
+        padding: 0 4px !important;
+    }
+
+    .polaroid-sticker-slot {
+        width: min(20%, 35px) !important; /* Sticker más chico para dejar respirar el texto */
+        margin-bottom: 4px !important;
+    }
+
+    /* Abanico perfecto sin taparse entre sí */
+    #world-2.world-corazon.corazon-climax #polaroid-piel,
+    #world-2.world-corazon.warm-reveal #polaroid-piel {
+        transform: translate(calc(-50% - 190px), -50%) rotate(-10deg) scale(0.9) !important;
+    }
+    #world-2.world-corazon.corazon-climax #polaroid-labios,
+    #world-2.world-corazon.warm-reveal #polaroid-labios {
+        transform: translate(-50%, calc(-50% + 15px)) rotate(2deg) scale(0.95) !important;
+    }
+    #world-2.world-corazon.corazon-climax #polaroid-ojos,
+    #world-2.world-corazon.warm-reveal #polaroid-ojos {
+        transform: translate(calc(-50% + 190px), -50%) rotate(10deg) scale(0.9) !important;
+    }
+
+
+    /* ─── 2. ARREGLO MENÚ ROCOLA ─── */
+    #menu-rocola {
+        padding: 10px 4vw !important; /* Quitamos el hundimiento superior */
+        align-items: center !important;
+    }
+
+    #menu-rocola .vinyl-header {
+        transform: translateY(-5%) !important; /* Subimos el panel izquierdo */
+    }
+
+    #menu-rocola .vinyl-selector {
+        height: 70dvh !important;
+        transform: translateY(-5%) !important; /* Subimos la rocola */
+    }
+
+    #menu-rocola .vinyl-wheel {
+        height: 48dvh !important;
+    }
+
+    /* Títulos de las canciones (Antes en 102%, los subimos al 85%) */
+    #menu-rocola .active-song-info {
+        top: 85% !important; 
+    }
+    
+    #menu-rocola .active-song-info h3 {
+        font-size: clamp(16px, 5vh, 24px) !important;
+    }
+    
+    #menu-rocola .active-song-info p {
+        font-size: clamp(10px, 3vh, 12px) !important;
+    }
+}
