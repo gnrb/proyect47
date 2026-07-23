@@ -19,19 +19,19 @@ class ChemicalFluidSim {
         this.config = {
             SIM_RESOLUTION: this.isMobile ? 96 : 128,
             DYE_RESOLUTION: this.isMobile ? 384 : 512,
-            WIPE_DISSIPATION: 0.985,    
-            VELOCITY_DISSIPATION: 0.99,
-            PRESSURE_DISSIPATION: 0.9,
+            WIPE_DISSIPATION: 0.95,       // (MÁS BAJO) El rastro visual se cierra más rápido
+            VELOCITY_DISSIPATION: 0.98,
+            PRESSURE_DISSIPATION: 0.8,
             PRESSURE_ITERATIONS: this.isMobile ? 14 : 22,
             CURL: this.isMobile ? 20 : 30,
-            SPLAT_RADIUS_PX: this.isMobile ? 12 : 16, // Toque mucho más fino
-            SPLAT_FORCE: 4200,                        
+            SPLAT_RADIUS_PX: this.isMobile ? 10 : 14, // Pincel más fino, cuesta más
+            SPLAT_FORCE: 2800,                        // Menos fuerza al agitar
             BASE_OPACITY: 0.96,
             MAX_PONDS: 4,
             POND_GRID_SIZE: 7,
-            CELL_CLEAR_THRESHOLD: 0.35,               // Más fácil que cuente como "limpio"
-            REVEAL_FRACTION: 0.55,                    // Solo necesitas limpiar el 55% de la foto
-            POND_DECAY_PER_SEC: 0.15,                 // El líquido vuelve MUCHO más lento
+            CELL_CLEAR_THRESHOLD: 0.65,               // Tienes que limpiar bien cada celda
+            REVEAL_FRACTION: 0.85,                    // Debes despejar el 85% de la foto
+            POND_DECAY_PER_SEC: 0.95,                 // El líquido regresa rápido si dejas de frotar
             REVEAL_SHRINK_SECONDS: 1.1
         };
 
@@ -506,8 +506,8 @@ class ChemicalFluidSim {
     }
 
     _addSplatToPonds(xPx, yPx, intensity) {
-        // Radio de interacción físico fino y preciso
-        const brush = 28; 
+        // Radio de interacción físico fino y preciso para que cueste revelar
+        const brush = 18; 
         
         this.ponds.forEach((pond) => {
             if (pond.revealed) return;
@@ -526,8 +526,8 @@ class ChemicalFluidSim {
                     if (cd > brush) continue;
                     
                     const falloff = 1 - (cd / brush);
-                    // Acumulación fuerte: limpia rápido por donde pasas
-                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * 0.45);
+                    // Acumulación débil: requiere que frotes más sobre el mismo lugar
+                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * 0.15);
                 }
             }
         });
@@ -570,10 +570,14 @@ class ChemicalFluidSim {
         const forceScale = this.config.SPLAT_FORCE * 0.0011;
         const vx = dx * forceScale;
         const vy = -dy * forceScale;
-        const wipeAmount = Math.min(1.4, 0.5 + (speed || 4) * 0.05);
+        
+        // Efecto visual de limpiar más contenido y menos exagerado
+        const wipeAmount = Math.min(0.85, 0.2 + (speed || 4) * 0.02);
 
         this._pendingSplats.push({ u, v, vx, vy, wipeAmount });
-        this._addSplatToPonds(x, y, Math.min(1, 0.4 + (speed || 4) * 0.03));
+        
+        // Impacto lógico en la foto disminuido para forzar a "frotar"
+        this._addSplatToPonds(x, y, Math.min(1, 0.15 + (speed || 4) * 0.015));
         this._ensureLoop();
     }
 
