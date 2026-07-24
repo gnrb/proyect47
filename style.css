@@ -14440,3 +14440,47 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         display: none !important;
     }
 }
+
+/* =====================================================================
+   BLOQUEO HORIZONTAL PARA PANTALLA FINAL (SOLO CELULARES)
+   ===================================================================== */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 560px) {
+    
+    /* 1. Ocultamos la tarjeta, la letra de la canción y el botón de replay */
+    #final-screen .final-letter-card,
+    #final-screen .final-dream-lyrics,
+    #final-screen .final-replay-btn {
+        display: none !important;
+    }
+
+    /* 2. Creamos una pantalla elegante pidiendo que giren el teléfono */
+    #final-screen::before {
+        content: "Gira tu celular en vertical para leer el mensaje final";
+        position: absolute;
+        inset: 0;
+        z-index: 90;
+        
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 40px;
+        
+        /* Fondo con el mismo tono romántico de la pantalla final */
+        background: 
+            radial-gradient(circle at center, rgba(236,72,153,0.18), transparent 70%), 
+            #030303;
+        backdrop-filter: blur(10px);
+        
+        color: #fff;
+        font-family: 'Playfair Display', serif;
+        font-size: clamp(20px, 4vw, 26px);
+        line-height: 1.4;
+    }
+
+    /* 3. Nos aseguramos de que el botón "Volver" quede por encima de todo por si quieren salir */
+    #final-screen .back-btn {
+        display: inline-flex !important;
+        z-index: 100 !important;
+    }
+}
