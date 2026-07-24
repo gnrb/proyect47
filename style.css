@@ -14172,3 +14172,98 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         padding: 8px 16px !important;
     }
 }
+
+/* =====================================================
+   FIX QUIRÚRGICO · #final-screen EN LANDSCAPE CORTO
+   (S24 FE, iPhone en horizontal, etc.)
+   Pegar AL FINAL de style.css, después de la línea 14174
+   ===================================================== */
+@media (orientation: landscape) and (max-height: 600px) {
+
+    /* 1. Scroll vertical nativo y fluido, sin pelear con el body */
+    #final-screen {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        justify-content: flex-start !important;
+        padding: max(46px, env(safe-area-inset-top, 20px)) 16px
+                 max(56px, env(safe-area-inset-bottom, 28px)) !important;
+    }
+
+    /* 2. La tarjeta se acomoda a su contenido, no al viewport */
+    .final-letter-card {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        width: min(78vw, 480px) !important;
+        padding: 16px 20px !important;
+        margin: 0 auto 12px auto !important;
+    }
+
+    .final-letter-card h2 {
+        font-size: clamp(19px, 4.4vh, 25px) !important;
+        margin-bottom: 8px !important;
+    }
+
+    .final-letter-card p {
+        font-size: clamp(12px, 2.6vh, 14px) !important;
+        line-height: 1.35 !important;
+        margin-bottom: 9px !important;
+    }
+
+    /* 3. FIX RAÍZ: le devolvemos el hueco de abajo que el mega-fix
+          le quitó a .smile-question-box, para que .smile-answer
+          (que es position:absolute) no se monte sobre los botones */
+    .final-letter-card .smile-question-box {
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 14px 14px 44px 14px !important; /* los 44px son el hueco real de la respuesta */
+        margin: 12px auto !important;
+        overflow: visible !important;
+    }
+
+    .final-letter-card .smile-question-box h3 {
+        font-size: clamp(17px, 3.6vh, 21px) !important;
+        margin-bottom: 8px !important;
+    }
+
+    .smile-btn {
+        min-width: 84px !important;
+        padding: 9px 14px !important;
+        font-size: 13px !important;
+    }
+
+    .smile-answer {
+        bottom: 8px !important;
+        font-size: clamp(13px, 2.4vh, 17px) !important;
+    }
+
+    .smile-question-box.accepted .smile-answer {
+        bottom: 10px !important;
+        font-size: clamp(15px, 2.8vh, 19px) !important;
+    }
+
+    /* 4. La letra flotante se va arriba-centro, pequeña,
+          lejos del replay-btn y del borde inferior de la tarjeta */
+    .final-dream-lyrics {
+        position: fixed !important;
+        top: max(8px, env(safe-area-inset-top, 6px)) !important;
+        bottom: auto !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: min(66vw, 360px) !important;
+    }
+
+    .final-dream-line {
+        font-size: clamp(11px, 2.2vh, 14px) !important;
+        padding: 6px 12px !important;
+    }
+
+    .final-replay-btn {
+        margin: 4px auto 8px auto !important;
+        padding: 10px 20px !important;
+        flex-shrink: 0 !important;
+    }
+}
