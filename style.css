@@ -14385,3 +14385,58 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         flex-shrink: 0 !important;
     }
 }
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+    /* 1. Destruimos el Flexbox estrangulador y activamos scroll nativo en toda la pantalla */
+    #final-screen {
+        display: block !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: max(40px, env(safe-area-inset-top)) 24px 120px !important;
+        height: 100dvh !important;
+    }
+
+    /* 2. La tarjeta crece todo lo que necesite, sin scroll interno */
+    #final-screen .final-letter-card {
+        display: block !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important; /* Vital para que el botón "ño" pueda huir sin cortarse */
+        margin: 0 auto 40px auto !important;
+        width: min(92vw, 680px) !important;
+    }
+
+    /* 3. La caja de la sonrisa mantiene su espacio sin chocar con el texto */
+    #final-screen .smile-question-box {
+        min-height: 190px !important;
+        margin: 30px auto !important;
+        position: relative !important;
+    }
+
+    /* 4. Letras de la canción ancladas a la ventana, no a la tarjeta */
+    #final-screen .final-dream-lyrics {
+        position: fixed !important;
+        top: 15px !important;
+        right: max(15px, env(safe-area-inset-right)) !important;
+        z-index: 9999 !important;
+        background: rgba(10, 12, 20, 0.85) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 99px !important;
+        padding-right: 15px !important;
+    }
+
+    /* 5. El botón de repetir vuelve a su flujo natural al final */
+    #final-screen .final-replay-btn {
+        display: block !important;
+        margin: 10px auto 50px !important;
+        position: relative !important;
+        z-index: 10 !important;
+    }
+
+    /* 6. Ocultamos el reproductor flotante en esta pantalla para no tapar la carta */
+    body:has(#final-screen.active) .floating-player,
+    body:has(#final-screen.active) .toggle-player-btn {
+        display: none !important;
+    }
+}
