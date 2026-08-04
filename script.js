@@ -2,6 +2,7 @@
 // 1. VARIABLES DEL DOM Y ESTADO GLOBAL
 // ==========================================
 const audio = document.getElementById('global-audio');
+audio.crossOrigin = "anonymous";
 audio.volume = 0.65;
 const introScreen = document.getElementById('intro-screen');
 const menuScreen = document.getElementById('menu-rocola');
@@ -123,7 +124,8 @@ const EXTRA_TRACKS = {
     "still-love-you": {
         title: "still love you",
         artist: "Dxngelo",
-        src: "canciones 1/Dxngelo - still love you.mp3"
+        src: "canciones 1/Dxngelo - still love you.mp3",
+        theme: "sunflower-glitch"
     },
     "sunflower": {
         title: "Sunflower",
@@ -135,20 +137,10 @@ const EXTRA_TRACKS = {
         artist: "Coldplay",
         src: "canciones 1/Til Kingdom Come - Coldplay.mp3"
     },
-    "seguro-te-pierdo": {
-        title: "Seguro Te Pierdo",
-        artist: "Sergi Kid Flex",
-        src: "canciones 1/Seguro Te Pierdo - Sergi Kid Flex.mp3"
-    },
     "te-quiero": {
         title: "Te quiero",
         artist: "Hombres G",
         src: "canciones 1/Te quiero - Hombres G.mp3"
-    },
-    "alguna-vez-alli": {
-        title: "Alguna Vez Allí Algo Ardió",
-        artist: "Mi Sobrino Memo",
-        src: "canciones 1/Alguna Vez Allí Algo Ardió - Mi Sobrino Memo.mp3"
     },
     "forever-young": {
         title: "Forever Young",
@@ -164,6 +156,11 @@ const EXTRA_TRACKS = {
         title: "Nubecita",
         artist: "Wuicho kun",
         src: "canciones 1/Nubecita - Wuicho kun.mp3"
+    },
+    "Loco(tu forma de ser)": {
+        title: "Loco(tu forma de ser)",
+        artist: "Los Auténticos Decadentes",
+        src: "canciones 1/Loco_Tu_Forma_de_Ser.mp3"
     }
 };
 
@@ -1145,6 +1142,7 @@ function togglePlay() {
         audio.pause();
         isPlaying = false;
     } else {
+        wakeUpWebAudio(); // <--- ¡AÑADE ESTO AQUÍ!
         audio.play().then(() => {
             isPlaying = true;
             updatePlayButton();
@@ -7931,26 +7929,27 @@ function surfacePolaroid(id) {
     p.style.setProperty('--sink-scale', 1);
 
     if (p.id === 'polaroid-secret') {
-    p.addEventListener('pointerdown', function triggerGlitch(e) {
-        e.stopPropagation();
-        if (secretPolaroidRevealed) return;
+        p.addEventListener('pointerdown', function triggerGlitch(e) {
+            e.stopPropagation();
+            if (secretPolaroidRevealed) return;
 
-        secretPolaroidRevealed = true;
-        // Alerta oficial del sistema
-        if (typeof unlockSecretError === 'function') unlockSecretError(2, 'world2_secret');
+            secretPolaroidRevealed = true;
+            // Alerta oficial del sistema
+            if (typeof unlockSecretError === 'function') unlockSecretError(2, 'world2_secret');
 
-        // Desvanecimiento físico de la foto
-        p.classList.remove('polaroid-glow');
-        p.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease, filter 0.2s';
-        p.style.transform = 'scale(1.2) rotate(-10deg) translateY(-20px)';
-        p.style.filter = 'contrast(2.5) brightness(1.5) hue-rotate(90deg)';
-        
-        setTimeout(() => {
-            p.style.opacity = '0';
-            p.style.pointerEvents = 'none';
-            setTimeout(() => p.classList.add('hidden-polaroid'), 450);
-        }, 150);
-    }, { once: true });
+            // Desvanecimiento físico de la foto
+            p.classList.remove('polaroid-glow');
+            p.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease, filter 0.2s';
+            p.style.transform = 'scale(1.15) rotate(-10deg) translateY(-20px)';
+            p.style.filter = 'contrast(2.5) brightness(1.5) hue-rotate(90deg)';
+            
+            setTimeout(() => {
+                p.style.opacity = '0';
+                p.style.pointerEvents = 'none';
+                setTimeout(() => p.classList.add('hidden-polaroid'), 450);
+            }, 250);
+        }, { once: true });
+
     } else if (p.id === 'polaroid-qr') {
         showAchievement('¡Revelado exitoso!', 'Anomalías descubiertas', 4500, 'minecraft');
     }
@@ -8731,10 +8730,10 @@ const EXTRA_TRACK_NOTES = {
     "sunflower": "Aca se habla de como una persona es algo caotica (en el buen sentido xd) y como a veces es dificil de entender, pero aun asi es hermosa y especial como un girasol",
     "til-kingdom-come": "En si esta tambien me recuerda a ti, pero porque  por ti hago varias cosas que no haria por nadie mas, y eso me hace pensar en ti",
     "te-quiero": "Bueno, la de aca simplemente es hermosa xd",
-    "alguna-vez-alli": "Me dijiste que te gustan las canciones tristes y gracias a ti tambien me gustan jksak",
     "forever-young": "La de aca si es algo personal para mi , no hay explicacion xd",
     "gone-gone-gone": "Esta creo que tanto tu y yo la conocemos jsajs",
-    "nubecita": "bueno , esta tambien es algo triste"
+    "nubecita": "bueno , esta tambien es algo triste",
+    "Loco(tu forma de ser)": "La letra lo dice todo, y la puse porque me recuerda a ti, y a tu forma de ser xd",
 };
 
 function getPlaylistRoomElements() {
@@ -8814,6 +8813,7 @@ function togglePlaylistRoomTrack() {
     updatePlaylistRoomNote(selectedKey);
 
     audio.play().then(() => {
+        wakeUpWebAudio();
         isPlaying = true;
         setPlaylistRoomPlayButtonState(true);
         startPlaylistVisualizer();
@@ -8830,6 +8830,51 @@ function togglePlaylistRoomTrack() {
 let playlistVisualizerRAF = null;
 let playlistVisualizerRunning = false;
 let crtParticles = [];
+
+// ==========================================
+// MOTOR WEB AUDIO API (Análisis en Tiempo Real)
+// ==========================================
+let audioCtx = null;
+let audioAnalyser = null;
+let audioSource = null;
+let freqData = null;
+let waveData = null;
+let webAudioInitialized = false;
+
+function initWebAudio() {
+    if (webAudioInitialized) return; 
+    
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        
+        audioAnalyser = audioCtx.createAnalyser();
+        audioAnalyser.fftSize = 256; 
+        audioAnalyser.smoothingTimeConstant = 0.8; 
+        
+        freqData = new Uint8Array(audioAnalyser.frequencyBinCount);
+        waveData = new Uint8Array(audioAnalyser.fftSize);
+        
+        // Conectar el cable de audio
+        audioSource = audioCtx.createMediaElementSource(audio);
+        audioSource.connect(audioAnalyser);
+        audioAnalyser.connect(audioCtx.destination);
+        
+        webAudioInitialized = true;
+    } catch (error) {
+        console.warn("Web Audio bloqueado. Usando visualizador simulado.", error);
+        audioAnalyser = null;
+        webAudioInitialized = true;
+    }
+}
+
+// Despertador manual seguro (solo se llamará en clics)
+function wakeUpWebAudio() {
+    initWebAudio();
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
 
 function resizePlaylistVisualizerCanvas() {
     const canvas = document.getElementById('playlist-visualizer-canvas');
@@ -8871,36 +8916,55 @@ function drawPlaylistVisualizerFrame() {
 
     const { ctx, width, height } = payload;
     const now = performance.now() * 0.001;
-    // Verificamos si realmente está sonando el audio sin secuestrar la API
     const isPlayingAudio = audio && !audio.paused && audio.currentTime > 0;
+
+    // ¡AQUÍ BORRAMOS EL INITWEBAUDIO QUE CAUSABA EL BUG!
 
     ctx.clearRect(0, 0, width, height);
 
-    // Fondo profundo
+    // Fondo profundo del monitor
     ctx.fillStyle = 'rgba(2, 3, 5, 0.7)';
     ctx.fillRect(0, 0, width, height);
 
     let bass = 0;
-
-    if (isPlayingAudio) {
-        // Bajo simulado con una combinación de ondas y ruido para sentirse orgánico
-        bass = 0.5 + Math.sin(now * 6) * 0.25 + Math.random() * 0.25;
+    
+    // --- LECTURA DE AUDIO REAL ---
+    if (isPlayingAudio && audioAnalyser) {
+        audioAnalyser.getByteFrequencyData(freqData);
+        audioAnalyser.getByteTimeDomainData(waveData);
         
-        if (bass > 0.75 && Math.random() > 0.6) {
-            crtParticles.push({
-                x: width * 0.1 + Math.random() * (width * 0.8),
-                y: height,
-                vx: (Math.random() - 0.5) * 2,
-                vy: -Math.random() * 4 - 2,
-                life: 1,
-                size: Math.random() * 2 + 1
-            });
+        // Calcular el poder del BAJO (las primeras 5 frecuencias)
+        let bassSum = 0;
+        for(let i = 0; i < 5; i++) {
+            bassSum += freqData[i];
         }
+        bass = (bassSum / 5) / 255; 
+    } else {
+        // En pausa: respiración suave
+        bass = Math.sin(now * 2) * 0.05 + 0.05;
     }
 
-    room.style.setProperty('--visualizer-bass', isPlayingAudio ? bass.toFixed(3) : (Math.sin(now * 2) * 0.05).toFixed(3));
+    // Impacto físico en el cuarto (hace saltar los woofers del fondo)
+    room.style.setProperty('--visualizer-bass', bass.toFixed(3));
 
-    // 1. Barras de Frecuencia Base (Lilac/Púrpura)
+    // --- SISTEMA DE MOODS (TEMAS) ---
+    let theme = "default";
+    if (extraTrackMode && activeExtraTrackKey && EXTRA_TRACKS[activeExtraTrackKey].theme) {
+        theme = EXTRA_TRACKS[activeExtraTrackKey].theme;
+    }
+
+    // Configuración estética según la canción
+    let waveColor = '#ff9d00';
+    let waveShadow = '#ff6a00';
+    let isGlitchy = false;
+
+    if (theme === "sunflower-glitch") {
+        waveColor = '#ffe259'; // Amarillo girasol vibrante
+        waveShadow = '#ff9100'; // Sombra naranja
+        isGlitchy = true; // Activa el efecto Spider-Verse
+    }
+
+    // --- BARRAS DE FRECUENCIA (Fondo) ---
     const bars = 48;
     const gap = width * 0.008;
     const barWidth = (width - (gap * (bars + 1))) / bars;
@@ -8909,20 +8973,26 @@ function drawPlaylistVisualizerFrame() {
 
     for (let i = 0; i < bars; i++) {
         let raw = 0;
-        if (isPlayingAudio) {
-            // Animación de frecuencia reactiva mezclando ondas y posición
-            raw = Math.abs(Math.sin(now * 8 + i * 0.3) * 0.5 + Math.cos(now * 3 - i * 0.1) * 0.3) + Math.random() * 0.2;
+        if (isPlayingAudio && audioAnalyser) {
+            // Mapear los datos de frecuencia reales (128) a nuestras 48 barras visuales
+            const dataIndex = Math.floor(i * (128 / bars));
+            raw = freqData[dataIndex] / 255; 
         } else {
-            // "Respiración" ambiental
-            raw = 0.05 + 0.05 * Math.sin(now * 1.2 + i * 0.15);
+            raw = 0.05 + 0.05 * Math.sin(now * 1.2 + i * 0.15); // Standby
         }
         
-        const h = height * 0.05 + (raw * height * 0.5);
+        const h = height * 0.05 + (raw * height * 0.6);
         const x = startX + i * (barWidth + gap);
         
         const progress = i / bars;
-        // Color lila hacia naranja
-        ctx.fillStyle = `rgba(${170 + progress*85}, ${85 + progress*65}, ${255 - progress*200}, ${0.5 + raw * 0.5})`;
+        
+        // Colores de las barras cambian levemente si es Sunflower
+        if (theme === "sunflower-glitch") {
+            ctx.fillStyle = `rgba(255, ${200 - progress*100}, ${0 + progress*50}, ${0.4 + raw * 0.5})`;
+        } else {
+            ctx.fillStyle = `rgba(${170 + progress*85}, ${85 + progress*65}, ${255 - progress*200}, ${0.5 + raw * 0.5})`;
+        }
+
         ctx.shadowBlur = 10;
         ctx.shadowColor = ctx.fillStyle;
         
@@ -8932,25 +9002,26 @@ function drawPlaylistVisualizerFrame() {
     }
     ctx.shadowBlur = 0;
 
-    // 2. Onda de Osciloscopio Principal
+    // --- ONDA DEL OSCILOSCOPIO (Frente) ---
     ctx.beginPath();
-    const waveAmp = height * 0.35;
+    const waveAmp = height * 0.40;
     const centerY = height * 0.45;
-    const steps = width > 500 ? 200 : 100;
+    const steps = isPlayingAudio && audioAnalyser ? waveData.length : (width > 500 ? 200 : 100);
 
-    for (let i = 0; i <= steps; i++) {
+    for (let i = 0; i < steps; i++) {
         const x = (i / steps) * width;
         let y = centerY;
 
-        if (isPlayingAudio) {
-            // Onda dinámica pseudo-reactiva
-            const v = Math.sin(i * 0.1 + now * 15) * 0.4 + Math.sin(i * 0.04 - now * 8) * 0.4 + (Math.random() * 0.1);
-            y = centerY + v * waveAmp;
+        if (isPlayingAudio && audioAnalyser) {
+            // Datos físicos reales de la voz/instrumentos
+            const v = waveData[i] / 128.0; // 128 es el centro de la onda
+            y = centerY + (v - 1) * waveAmp;
         } else {
+            // Standby
             let localTime = (now % 2.0);
             let pulsePhase = ((i / steps) - (localTime - 0.5)) * 10;
             let damp = Math.exp(-Math.pow(pulsePhase, 2) * 2);
-            y = centerY + Math.sin(pulsePhase * 3) * waveAmp * 0.35 * damp;
+            y = centerY + Math.sin(pulsePhase * 3) * (height*0.2) * damp;
         }
 
         if (i === 0) ctx.moveTo(x, y);
@@ -8958,25 +9029,56 @@ function drawPlaylistVisualizerFrame() {
     }
 
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#ff9d00';
-    ctx.shadowColor = '#ff6a00';
+    ctx.strokeStyle = waveColor;
+    ctx.shadowColor = waveShadow;
     ctx.shadowBlur = 18;
     ctx.stroke();
 
+    // El centro blanco para que parezca luz LED
     ctx.lineWidth = 1;
     ctx.strokeStyle = '#fff';
     ctx.shadowBlur = 0;
     ctx.stroke();
 
-    // 3. Partículas de "Polvo de Fósforo"
+    // --- EFECTO GLITCH SPIDER-VERSE (Solo para Sunflower cuando pega el bajo) ---
+    if (isGlitchy && bass > 0.75 && isPlayingAudio) {
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.globalCompositeOperation = "screen";
+        
+        // Desfase Cian
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+        ctx.translate(Math.random() * 8 - 4, Math.random() * 4 - 2);
+        ctx.stroke();
+        
+        // Desfase Magenta
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)';
+        ctx.translate(Math.random() * 8 - 4, Math.random() * 4 - 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // --- PARTÍCULAS REACTIVAS ---
+    if (isPlayingAudio && bass > 0.7 && Math.random() > 0.5) {
+        crtParticles.push({
+            x: width * 0.1 + Math.random() * (width * 0.8),
+            y: height,
+            vx: (Math.random() - 0.5) * (isGlitchy ? 4 : 2), // Más rápidas si es glitch
+            vy: -Math.random() * 4 - 2,
+            life: 1,
+            size: Math.random() * 2 + 1,
+            isSpark: isGlitchy && Math.random() > 0.7 // Algunas son chispas para Sunflower
+        });
+    }
+
     crtParticles = crtParticles.filter(p => {
         p.x += p.vx;
         p.y += p.vy;
         p.life -= 0.02;
         
         if(p.life > 0) {
-            ctx.fillStyle = `rgba(255, 157, 0, ${p.life})`;
-            ctx.shadowColor = '#ff9d00';
+            ctx.fillStyle = p.isSpark ? `rgba(255, 255, 255, ${p.life})` : `rgba(255, 157, 0, ${p.life})`;
+            ctx.shadowColor = p.isSpark ? '#00ffff' : '#ff9d00';
             ctx.shadowBlur = 8;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
