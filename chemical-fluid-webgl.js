@@ -24,14 +24,14 @@ class ChemicalFluidSim {
             PRESSURE_DISSIPATION: 0.9,
             PRESSURE_ITERATIONS: this.isMobile ? 14 : 22,
             CURL: this.isMobile ? 20 : 30,
-            SPLAT_RADIUS_PX: this.isMobile ? 12 : 16, 
-            SPLAT_FORCE: 4200,                        
+            SPLAT_RADIUS_PX: this.isMobile ? 22 : 30, // Tamaño de dedo/mouse real
+            SPLAT_FORCE: 4800,                        
             BASE_OPACITY: 0.96,
             MAX_PONDS: 4,
             POND_GRID_SIZE: 7,
-            CELL_CLEAR_THRESHOLD: 0.35,               // Vuelve a ser fácil contar como "limpio"
-            REVEAL_FRACTION: 0.55,                    // Solo necesitas limpiar el 55% de la foto
-            POND_DECAY_PER_SEC: 0.15,                 // El líquido vuelve súper lento
+            CELL_CLEAR_THRESHOLD: 0.25, // Más sensible al tacto
+            REVEAL_FRACTION: 0.65,      // Descubrir el 65% del área total acumulada
+            POND_DECAY_PER_SEC: 0.15,   
             REVEAL_SHRINK_SECONDS: 1.1
         };
 
@@ -267,7 +267,7 @@ class ChemicalFluidSim {
         uniform float uWarmth;
 
         void main () {
-            // Muestreo suavizado (5 taps) para eliminar el aliasing/pixelado del borde del wipe
+            // Muestreo suavizado
             vec2 texel = vec2(0.0022, 0.0022 * aspectRatio);
             float wipeSample =
                 texture2D(uWipe, vUv).r * 2.0 +
@@ -284,7 +284,6 @@ class ChemicalFluidSim {
             c.x *= aspectRatio;
             float g = 1.0 - clamp(length(c) * 1.6, 0.0, 1.0);
             
-            // Colores base dinámicos sincronizados con el fondo
             vec3 darkRed = vec3(0.05, 0.015, 0.02);
             vec3 lightRed = vec3(0.42, 0.05, 0.06);
             vec3 darkWarm = vec3(0.08, 0.04, 0.01);
@@ -462,6 +461,7 @@ class ChemicalFluidSim {
         const gridSize = this.config.POND_GRID_SIZE;
         const cells = new Float32Array(gridSize * gridSize);
         const activeMask = new Uint8Array(gridSize * gridSize);
+        const discoveredMask = new Uint8Array(gridSize * gridSize); // MEMORIA DEL RASPADITO
         let activeCount = 0;
 
         for (let row = 0; row < gridSize; row++) {
@@ -478,7 +478,7 @@ class ChemicalFluidSim {
 
         this.ponds.set(id, {
             id, xPx, yPx, radiusPx,
-            gridSize, cells, activeMask, activeCount,
+            gridSize, cells, activeMask, discoveredMask, activeCount,
             clearedFraction: 0,
             revealed: false,
             currentRadius: radiusPx,
@@ -506,8 +506,8 @@ class ChemicalFluidSim {
     }
 
     _addSplatToPonds(xPx, yPx, intensity) {
-        // Radio de interacción físico fino y preciso
-        const brush = 28; 
+        // Enlaza el radio lógico a la configuración visual para evitar desajustes
+        const brush = this.config.SPLAT_RADIUS_PX * 1.5; 
         
         this.ponds.forEach((pond) => {
             if (pond.revealed) return;
@@ -520,14 +520,16 @@ class ChemicalFluidSim {
                 for (let col = 0; col < gridSize; col++) {
                     const idx = row * gridSize + col;
                     if (!pond.activeMask[idx]) continue;
+                    
                     const cellX = pond.xPx + ((col + 0.5) / gridSize * 2 - 1) * pond.radiusPx;
                     const cellY = pond.yPx + ((row + 0.5) / gridSize * 2 - 1) * pond.radiusPx;
                     const cd = Math.hypot(xPx - cellX, yPx - cellY);
+                    
                     if (cd > brush) continue;
                     
                     const falloff = 1 - (cd / brush);
-                    // Acumulación fuerte: limpia rápido por donde pasas
-                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * 0.45);
+                    // Acumulamos muy rápido para que sea fluido
+                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * 0.55);
                 }
             }
         });
@@ -543,13 +545,24 @@ class ChemicalFluidSim {
                 return;
             }
 
-            let clearedCells = 0;
+            let discoveredCells = 0;
             for (let i = 0; i < pond.cells.length; i++) {
                 if (!pond.activeMask[i]) continue;
-                pond.cells[i] *= decayFactor;
-                if (pond.cells[i] >= this.config.CELL_CLEAR_THRESHOLD) clearedCells++;
+                
+                pond.cells[i] *= decayFactor; // Decay visual temporal
+                
+                // Si la celda alcanzó el límite una vez, la marcamos como revelada permanentemente
+                if (pond.cells[i] >= this.config.CELL_CLEAR_THRESHOLD) {
+                    pond.discoveredMask[i] = 1;
+                }
+                
+                if (pond.discoveredMask[i] === 1) {
+                    discoveredCells++;
+                }
             }
-            pond.clearedFraction = pond.activeCount ? clearedCells / pond.activeCount : 0;
+            
+            // La fracción ahora depende del progreso guardado en memoria
+            pond.clearedFraction = pond.activeCount ? discoveredCells / pond.activeCount : 0;
             this.onPondUpdate(pond.id, pond.clearedFraction);
 
             if (pond.clearedFraction >= this.config.REVEAL_FRACTION) {
@@ -730,10 +743,8 @@ class ChemicalFluidSim {
         if (!this.gl) return;
         const gl = this.gl;
 
-        // FIX: Asegurar que el viewport esté apuntando correctamente a la textura para que el clear afecte toda el área
         gl.viewport(0, 0, this.wipe.read.width, this.wipe.read.height);
 
-        // Limpiar textura de Wipe (El líquido opaco vuelve a llenar la pantalla)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.wipe.read.fbo);
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -744,7 +755,6 @@ class ChemicalFluidSim {
 
         gl.viewport(0, 0, this.velocity.read.width, this.velocity.read.height);
 
-        // Limpiar textura de Velocidad (Detiene cualquier inercia previa del fluido)
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.velocity.read.fbo);
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -753,11 +763,11 @@ class ChemicalFluidSim {
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        // Reiniciar las físicas y contadores de las polaroids hundidas
         this.ponds.forEach(pond => {
             pond.clearedFraction = 0;
             pond.revealed = false;
             pond.cells.fill(0);
+            pond.discoveredMask.fill(0); // FIX: Limpiamos la memoria también
             pond.currentRadius = pond.radiusPx;
             pond.targetRadius = pond.radiusPx;
         });
