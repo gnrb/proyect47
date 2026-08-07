@@ -24,13 +24,13 @@ class ChemicalFluidSim {
             PRESSURE_DISSIPATION: 0.9,
             PRESSURE_ITERATIONS: this.isMobile ? 14 : 22,
             CURL: this.isMobile ? 20 : 30,
-            SPLAT_RADIUS_PX: this.isMobile ? 22 : 30, // Tamaño de dedo/mouse real
+            SPLAT_RADIUS_PX: this.isMobile ? 22 : 30,
             SPLAT_FORCE: 4800,                        
             BASE_OPACITY: 0.96,
             MAX_PONDS: 4,
             POND_GRID_SIZE: 7,
-            CELL_CLEAR_THRESHOLD: 0.25, // Más sensible al tacto
-            REVEAL_FRACTION: 0.65,      // Descubrir el 65% del área total acumulada
+            CELL_CLEAR_THRESHOLD: this.isMobile ? 0.55 : 0.25, // <-- Más fricción en móvil
+            REVEAL_FRACTION: this.isMobile ? 0.85 : 0.65,      // <-- Exige descubrir más área en móvil
             POND_DECAY_PER_SEC: 0.15,   
             REVEAL_SHRINK_SECONDS: 1.1
         };
@@ -392,7 +392,31 @@ class ChemicalFluidSim {
         };
     }
 
+    // _initFramebuffers() se re-ejecuta en cada resize/orientationchange (ver
+    // _resizeCanvas). Sin esto, cada llamada creaba 8 texturas + framebuffers
+    // nuevos (velocity x2, wipe x2, divergence, curl, pressure x2) y
+    // abandonaba los anteriores sin liberarlos — una fuga real de memoria de
+    // GPU. En Safari móvil, donde la barra de direcciones dispara resize al
+    // hacer scroll, esto podía acumularse rápido y eventualmente perder el
+    // contexto WebGL (pantalla del fluido se rompe/congela).
+    _deleteFBO(fboObj) {
+        if (!fboObj) return;
+        const gl = this.gl;
+        gl.deleteTexture(fboObj.texture);
+        gl.deleteFramebuffer(fboObj.fbo);
+    }
+
+    _disposeFramebuffers() {
+        if (this.velocity) { this._deleteFBO(this.velocity.read); this._deleteFBO(this.velocity.write); }
+        if (this.wipe) { this._deleteFBO(this.wipe.read); this._deleteFBO(this.wipe.write); }
+        if (this.divergence) this._deleteFBO(this.divergence);
+        if (this.curl) this._deleteFBO(this.curl);
+        if (this.pressure) { this._deleteFBO(this.pressure.read); this._deleteFBO(this.pressure.write); }
+    }
+
     _initFramebuffers() {
+        this._disposeFramebuffers();
+
         const gl = this.gl;
         const type = this._texType.type;
         const filter = this._supportsLinear ? gl.LINEAR : gl.NEAREST;
@@ -528,8 +552,9 @@ class ChemicalFluidSim {
                     if (cd > brush) continue;
                     
                     const falloff = 1 - (cd / brush);
-                    // Acumulamos muy rápido para que sea fluido
-                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * 0.55);
+                    // Restamos peso al toque si es un celular para compensar la alta frecuencia de toques
+                    const splatWeight = this.isMobile ? 0.12 : 0.55; 
+                    pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * splatWeight);
                 }
             }
         });
@@ -586,6 +611,7 @@ class ChemicalFluidSim {
         const wipeAmount = Math.min(1.4, 0.5 + (speed || 4) * 0.05);
 
         this._pendingSplats.push({ u, v, vx, vy, wipeAmount });
+        if (this._pendingSplats.length > 64) this._pendingSplats.shift();
         this._addSplatToPonds(x, y, Math.min(1, 0.4 + (speed || 4) * 0.03));
         this._ensureLoop();
     }
