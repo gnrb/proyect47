@@ -6417,16 +6417,22 @@ function initGalaxy() {
         { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' } 
     ];
     flareGhosts.forEach((g, i) => {
-        const mat = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(g.color),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: g.opacity,
-            depthWrite: false
-        });
-        const sprite = new THREE.Sprite(mat);
-        sprite.scale.set(g.scale, g.scale, 1);
+        let sprite;
+        if (isMobile) {
+            // RESTAURADO: Usamos Points en celular para evitar el bug del geíser
+            sprite = createGalaxyGlowPoints(auraTexture, g.color, g.opacity, g.scale);
+        } else {
+            const mat = new THREE.SpriteMaterial({
+                map: auraTexture,
+                color: new THREE.Color(g.color),
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                opacity: g.opacity,
+                depthWrite: false
+            });
+            sprite = new THREE.Sprite(mat);
+            sprite.scale.set(g.scale, g.scale, 1);
+        }
 
         sprite.userData = {
             dist: g.dist,
@@ -6494,18 +6500,23 @@ function initGalaxy() {
         const auraOpacity = isHighEndMobile ? 0.68 : 0.58;
         const auraSize = isHighEndMobile ? 1.72 : 1.45;
 
-        // Ya no hay "if (isMobile)". Usamos Sprite para todos.
-        const auraMaterial = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(auraColor),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: auraOpacity,
-            depthWrite: false,
-            depthTest: false
-        });
-        const aura = new THREE.Sprite(auraMaterial);
-        aura.scale.set(auraSize, auraSize, 1);
+        let aura;
+        if (isMobile) {
+            // RESTAURADO: Usamos Points en celular para evitar el bug del geíser
+            aura = createGalaxyGlowPoints(auraTexture, auraColor, auraOpacity, auraSize);
+        } else {
+            const auraMaterial = new THREE.SpriteMaterial({
+                map: auraTexture,
+                color: new THREE.Color(auraColor),
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                opacity: auraOpacity,
+                depthWrite: false,
+                depthTest: false
+            });
+            aura = new THREE.Sprite(auraMaterial);
+            aura.scale.set(auraSize, auraSize, 1);
+        }
 
         aura.position.set(x, y, z);
         aura.userData = {
