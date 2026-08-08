@@ -6557,27 +6557,55 @@ function initGalaxy() {
     }
 
     // --- ESTRELLA AZUL SECRETA ---
-    const blueAuraMaterial = new THREE.SpriteMaterial({
-        map: blueSecretAuraTexture,
-        color: new THREE.Color('#7edcff'),
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: isHighEndMobile ? 0.48 : 0.40,
-        depthWrite: false
-    });
+    // El aura (blueSecretAura) NO es clicable — se puede migrar a Points sin
+    // ningún riesgo, igual que el núcleo y las auras normales. Se pierde el
+    // detalle elíptico (Points solo admite un tamaño escalar), pero a cambio
+    // deja de "desaparecer"/aplastarse por la misma distorsión de aspect que
+    // afectaba a los Sprites grandes.
+    const blueAuraOpacity = isHighEndMobile ? 0.48 : 0.40;
+    const blueAuraSizeX = isHighEndMobile ? 1.95 : 1.68;
+    const blueAuraSizeY = isHighEndMobile ? 1.52 : 1.36;
 
-    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+    if (isMobile) {
+        blueSecretAura = createGalaxyGlowPoints(
+            blueSecretAuraTexture,
+            '#7edcff',
+            blueAuraOpacity,
+            (blueAuraSizeX + blueAuraSizeY) / 2 // se pierde la elipse, promedio razonable
+        );
+    } else {
+        const blueAuraMaterial = new THREE.SpriteMaterial({
+            map: blueSecretAuraTexture,
+            color: new THREE.Color('#7edcff'),
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: blueAuraOpacity,
+            depthWrite: false
+        });
+        blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+        blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
+    }
+
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
-    blueSecretAura.scale.set(isHighEndMobile ? 1.95 : 1.68, isHighEndMobile ? 1.52 : 1.36, 1);
     blueSecretAura.userData = {
-        baseScale: isHighEndMobile ? 1.95 : 1.68,
-        baseScaleY: isHighEndMobile ? 1.52 : 1.36,
+        baseScale: blueAuraSizeX,
+        baseScaleY: blueAuraSizeY,
         phase: Math.random() * Math.PI * 2
     };
     galaxyScene.add(blueSecretAura);
 
+    // blueSecretStar SÍ es clicable (raycaster más abajo) — se queda como
+    // Sprite siempre, para no tocar esa lógica. Lo que cambia es la textura:
+    // asteroidFlareTexture tiene una cruz de destello dibujada a mano (dos
+    // elipses, una horizontal y una vertical) directamente en el PNG. En
+    // desktop esa cruz siempre se vio bien, pero en el aspect extremo de
+    // celular landscape es justo lo que se estira en un "geíser" vertical.
+    // En móvil usamos starTexture (el mismo círculo suave de las estrellas
+    // normales, ya confirmado sin artefactos) — el color celeste sigue
+    // distinguiéndola, y la rotación de abajo (material.rotation) queda
+    // como no-op inofensivo sobre un círculo.
     const blueStarMaterial = new THREE.SpriteMaterial({
-        map: asteroidFlareTexture, // Usamos el nuevo destello
+        map: isMobile ? starTexture : asteroidFlareTexture,
         color: new THREE.Color('#99d6ff'), // Un azul un poco más vibrante
         blending: THREE.AdditiveBlending,
         transparent: true,
@@ -6594,6 +6622,7 @@ function initGalaxy() {
     };
 
     galaxyScene.add(blueSecretStar);
+
 
     // Hitbox invisible del Agujero Negro
     const coreGeometry = new THREE.SphereGeometry(0.8, 16, 16);
@@ -7075,7 +7104,13 @@ function tick() {
             const pulse = Math.sin(time * 1.65 + blueSecretAura.userData.phase) * 0.10;
             const scaleX = blueSecretAura.userData.baseScale + pulse;
             const scaleY = (blueSecretAura.userData.baseScaleY || 1.28) + pulse * 0.58;
+            // scale.set afecta al Sprite (desktop, elíptico de verdad).
+            // material.size afecta al Points (móvil) — un solo escalar, así
+            // que usamos el promedio de X/Y como aproximación razonable.
             blueSecretAura.scale.set(scaleX, scaleY, 1);
+            if (blueSecretAura.material.size !== undefined) {
+                blueSecretAura.material.size = (scaleX + scaleY) / 2;
+            }
             blueSecretAura.material.opacity = 0.26 + Math.sin(time * 1.35) * 0.055;
         }
         
