@@ -5772,9 +5772,25 @@ function createCircleTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128; 
     const context = canvas.getContext('2d');
+
+    // FIX FORMA "RECTANGULAR" EN MÓVIL: antes esto era un círculo de borde
+    // totalmente duro (context.arc().fill() sin degradado). Un borde tan
+    // abrupto, al pasar por la cadena de mipmaps de UnrealBloomPass (que
+    // en móvil corre a una resolución mucho más baja que en desktop, ver
+    // GALAXY_BLOOM_MIN_HEIGHT), tiende a mostrar "esquinas"/bloques en vez
+    // de un halo redondo — el blur de cada mip es efectivamente una caja,
+    // y una caja sobre un borde duro deja ver su propia forma. Un
+    // pequeñísimo degradado en el 18% final del radio (el núcleo sigue
+    // siendo sólido, solo se suaviza el borde) le da a esa cadena de blur
+    // algo con qué trabajar sin dejar de verse como un punto nítido.
+    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 45);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.82, 'rgba(255,255,255,1)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
     context.beginPath(); 
     context.arc(64, 64, 45, 0, Math.PI * 2); // Margen gigante de seguridad
-    context.fillStyle = '#ffffff'; 
+    context.fillStyle = gradient; 
     context.fill();
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -5782,6 +5798,31 @@ function createCircleTexture() {
     return texture;
 }
 const starTexture = createCircleTexture();
+
+function createAsteroidFlareTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const cx = 128, cy = 128;
+
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+    core.addColorStop(0, 'rgba(255,255,255,1)');
+    core.addColorStop(0.3, 'rgba(160,220,255,0.9)');
+    core.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = core;
+    ctx.fillRect(0,0,256,256);
+
+    ctx.fillStyle = 'rgba(140, 210, 255, 0.8)';
+    ctx.beginPath(); ctx.ellipse(cx, cy, 100, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 5, 100, 0, 0, Math.PI * 2); ctx.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
+}
+const asteroidFlareTexture = createAsteroidFlareTexture();
 
 function createNebulaTexture() {
     const canvas = document.createElement('canvas');
@@ -5798,24 +5839,26 @@ function createNebulaTexture() {
     return texture;
 }
 
-// --- AURA PARA EL NÚCLEO Y 6 ESTRELLAS ---
 function createAuraTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 512; 
-    canvas.height = 512;
+    canvas.width = 256; canvas.height = 256;
     const ctx = canvas.getContext('2d');
-    const cx = 256, cy = 256;
+    ctx.clearRect(0, 0, 256, 256);
 
-    // Resplandor radial volumétrico súper suave
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
-    gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
-    gradient.addColorStop(0.08, 'rgba(255, 248, 220, 0.90)');
-    gradient.addColorStop(0.25, 'rgba(255, 220, 150, 0.40)');
-    gradient.addColorStop(0.60, 'rgba(255, 160, 80, 0.08)');
-    gradient.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 512, 512);
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 110);
+    gradient.addColorStop(0.00, 'rgba(255, 248, 220, 0.92)');
+    gradient.addColorStop(0.12, 'rgba(255, 235, 180, 0.60)');
+    gradient.addColorStop(0.30, 'rgba(255, 210, 130, 0.24)');
+    gradient.addColorStop(0.55, 'rgba(255, 180,  90, 0.09)');
+    gradient.addColorStop(1.00, 'rgba(0,0,0,0)'); 
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+
+    ctx.globalCompositeOperation = 'screen';
+    const ringGrad = ctx.createRadialGradient(128, 128, 38, 128, 128, 96);
+    ringGrad.addColorStop(0.0,  'rgba(255, 255, 255, 0)');
+    ringGrad.addColorStop(0.45, 'rgba(255, 240, 200, 0.045)');
+    ringGrad.addColorStop(1.0,  'rgba(255,255,255,0)');
+    ctx.fillStyle = ringGrad; ctx.fillRect(0, 0, 256, 256);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -5824,38 +5867,38 @@ function createAuraTexture() {
 }
 const auraTexture = createAuraTexture();
 
-// --- AURA PARA LA ESTRELLA AZUL SECRETA ---
-function createBlueSecretAuraTexture() {
+function createBlueSecretAuraTexture(saturated = false) {
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = 192; canvas.height = 192;
     const ctx = canvas.getContext('2d');
-    const cx = 256, cy = 256;
+    ctx.clearRect(0, 0, 192, 192);
+    ctx.globalCompositeOperation = 'lighter';
 
-    // Transición perfecta de Blanco -> Cyan -> Azul Rey profundo
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
-    gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
-    gradient.addColorStop(0.10, 'rgba(160, 230, 255, 0.85)');
-    gradient.addColorStop(0.35, 'rgba(20, 100, 255, 0.35)');
-    gradient.addColorStop(0.70, 'rgba(0, 30, 180, 0.05)');
-    gradient.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 512, 512);
+    const base = ctx.createRadialGradient(96, 96, 0, 96, 96, 80);
+    if (saturated) {
+        // MÓVIL: núcleo blanco más chico + azul más dominante/saturado
+        // desde antes en el degradado. En desktop el core.color de
+        // blueStarMaterial ya se lee azul sin ayuda; en móvil el bloom de
+        // menor resolución diluye más luz blanca/dorada del disco cercano
+        // sobre la estrella, así que le damos un punto de partida más
+        // azul para que sobreviva esa mezcla en vez de leerse blanquecina.
+        base.addColorStop(0.00, 'rgba(255,255,255,0.40)');
+        base.addColorStop(0.10, 'rgba(80,190,255,0.55)');
+        base.addColorStop(1.00, 'rgba(0,0,0,0)');
+    } else {
+        base.addColorStop(0.00, 'rgba(255,255,255,0.52)');
+        base.addColorStop(0.16, 'rgba(120,215,255,0.30)');
+        base.addColorStop(1.00, 'rgba(0,0,0,0)');
+    }
+    ctx.fillStyle = base; ctx.fillRect(0, 0, 192, 192);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     return texture;
 }
-const blueSecretAuraTexture = createBlueSecretAuraTexture();
-
-// --- ESTRELLA PURA (sin los aros extraños) ---
-function createAsteroidFlareTexture() {
-    return starTexture; // Reutilizamos el círculo perfecto
-}
-
-const asteroidFlareTexture = createAsteroidFlareTexture();
+const blueSecretAuraTexture = createBlueSecretAuraTexture(false);
+const blueSecretAuraTextureMobile = createBlueSecretAuraTexture(true);
 
 function createGalaxyStreakTexture() {
     const canvas = document.createElement('canvas');
@@ -6413,13 +6456,14 @@ function initGalaxy() {
     // === DESTELLO DE LENTE EN EL NÚCLEO (EL CUÁSAR ESFÉRICO) ===
     galaxyCoreFlareGroup = new THREE.Group();
     const flareGhosts = [
-        { dist: 0,    scale: 3.5, opacity: 0.85, color: '#ffffff' },
-        { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' } 
+        { dist: 0,    scale: 3.5, opacity: 0.85, color: '#ffffff' }, // Unificado como en PC
+        { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' }  // Unificado como en PC
     ];
     flareGhosts.forEach((g, i) => {
         let sprite;
+
         if (isMobile) {
-            // RESTAURADO: Usamos Points en celular para evitar el bug del geíser
+            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
             sprite = createGalaxyGlowPoints(auraTexture, g.color, g.opacity, g.scale);
         } else {
             const mat = new THREE.SpriteMaterial({
@@ -6502,7 +6546,7 @@ function initGalaxy() {
 
         let aura;
         if (isMobile) {
-            // RESTAURADO: Usamos Points en celular para evitar el bug del geíser
+            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
             aura = createGalaxyGlowPoints(auraTexture, auraColor, auraOpacity, auraSize);
         } else {
             const auraMaterial = new THREE.SpriteMaterial({
@@ -6547,29 +6591,28 @@ function initGalaxy() {
     // detalle elíptico (Points solo admite un tamaño escalar), pero a cambio
     // deja de "desaparecer"/aplastarse por la misma distorsión de aspect que
     // afectaba a los Sprites grandes.
-    // --- ESTRELLA AZUL SECRETA ---
     const blueAuraOpacity = isHighEndMobile ? 0.48 : 0.40;
     const blueAuraSizeX = isHighEndMobile ? 1.95 : 1.68;
     const blueAuraSizeY = isHighEndMobile ? 1.52 : 1.36;
 
     if (isMobile) {
         blueSecretAura = createGalaxyGlowPoints(
-            blueSecretAuraTexture,
-            '#0088ff', // <-- Cambiado de '#7edcff' a un azul rey profundo
+            blueSecretAuraTextureMobile,
+            '#4dd2ff',
             blueAuraOpacity,
-            (blueAuraSizeX + blueAuraSizeY) / 2
+            (blueAuraSizeX + blueAuraSizeY) / 2 // se pierde la elipse, promedio razonable
         );
     } else {
         const blueAuraMaterial = new THREE.SpriteMaterial({
-        map: blueSecretAuraTexture,
-        color: new THREE.Color('#0066ff'),
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: blueAuraOpacity,
-        depthWrite: false
-    });
-    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
-    blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
+            map: blueSecretAuraTexture,
+            color: new THREE.Color('#7edcff'),
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: blueAuraOpacity,
+            depthWrite: false
+        });
+        blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+        blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
     }
 
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
@@ -6580,9 +6623,25 @@ function initGalaxy() {
     };
     galaxyScene.add(blueSecretAura);
 
+    // blueSecretStar SÍ es clicable (raycaster más abajo) — se queda como
+    // Sprite siempre, para no tocar esa lógica. Lo que cambia es la textura:
+    // asteroidFlareTexture tiene una cruz de destello dibujada a mano (dos
+    // elipses, una horizontal y una vertical) directamente en el PNG. En
+    // desktop esa cruz siempre se vio bien, pero en el aspect extremo de
+    // celular landscape es justo lo que se estira en un "geíser" vertical.
+    // En móvil usamos starTexture (el mismo círculo suave de las estrellas
+    // normales, ya confirmado sin artefactos) — el color celeste sigue
+    // distinguiéndola, y la rotación de abajo (material.rotation) queda
+    // como no-op inofensivo sobre un círculo.
+    //
+    // Color más saturado en móvil (#33c8ff vs #99d6ff en desktop): el
+    // bloom en móvil corre a menor resolución (GALAXY_BLOOM_MIN_HEIGHT),
+    // así que diluye más luz blanca/dorada del disco cercano sobre la
+    // estrella. Un azul más "puro" desde el origen sobrevive mejor esa
+    // mezcla en vez de leerse casi blanca.
     const blueStarMaterial = new THREE.SpriteMaterial({
-        map: starTexture,
-        color: new THREE.Color('#0088ff'),
+        map: isMobile ? starTexture : asteroidFlareTexture,
+        color: new THREE.Color(isMobile ? '#33c8ff' : '#99d6ff'),
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 1,
