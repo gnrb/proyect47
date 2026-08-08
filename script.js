@@ -5754,6 +5754,7 @@ let interactiveStarAuras = [];
 let blueSecretStar = null;
 let blueSecretAura = null;
 let nearDustParticles; 
+let galaxyBackgroundStars = null;
 let galaxyNebulaGroup = null;
 let galaxyDustLaneGroup = null;
 let galaxyCoreGlowGroup = null;
@@ -6529,6 +6530,92 @@ function initGalaxy() {
     nearDustParticles = new THREE.Points(dustGeo, dustMat);
     galaxyScene.add(nearDustParticles);
 
+    // --- ESTRELLAS DE FONDO (atmósfera del espacio vacío) ---
+    // Capa distante y estática (con un titileo muy sutil) para que el negro
+    // alrededor de la galaxia no se sienta tan vacío. Misma técnica de
+    // Points+shader que ya sabemos que es segura en el S24 FE (nada de
+    // Sprite). Van en una esfera hueca, bien lejos del disco (radio 25-55,
+    // dentro del far=100 de la cámara) para que se sientan "de fondo" y no
+    // se mezclen con las partículas de la galaxia.
+    const bgStarCount = isHighEndMobile ? 3200 : (isMobile ? 2000 : 3600);
+    const bgStarGeo = new THREE.BufferGeometry();
+    const bgStarPos = new Float32Array(bgStarCount * 3);
+    const bgStarSize = new Float32Array(bgStarCount);
+    const bgStarPhase = new Float32Array(bgStarCount);
+    const bgStarTint = new Float32Array(bgStarCount * 3);
+
+    const bgStarPalette = [
+        new THREE.Color('#ffffff'),
+        new THREE.Color('#cfe0ff'), // blanco-azulado
+        new THREE.Color('#fff1d0')  // blanco-cálido
+    ];
+
+    for (let i = 0; i < bgStarCount; i++) {
+        // Punto aleatorio uniforme sobre una esfera, luego escalado a un
+        // radio aleatorio entre 25 y 55 (grosor de la "cáscara").
+        const u = Math.random();
+        const v = Math.random();
+        const theta = u * Math.PI * 2;
+        const phi = Math.acos(2 * v - 1);
+        const r = 25 + Math.random() * 30;
+
+        bgStarPos[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
+        bgStarPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        bgStarPos[i * 3 + 2] = r * Math.cos(phi);
+
+        bgStarSize[i] = 0.55 + Math.random() * 1.1;
+        bgStarPhase[i] = Math.random() * Math.PI * 2;
+
+        const tint = bgStarPalette[Math.floor(Math.random() * bgStarPalette.length)];
+        bgStarTint[i * 3 + 0] = tint.r;
+        bgStarTint[i * 3 + 1] = tint.g;
+        bgStarTint[i * 3 + 2] = tint.b;
+    }
+
+    bgStarGeo.setAttribute('position', new THREE.BufferAttribute(bgStarPos, 3));
+    bgStarGeo.setAttribute('aSize', new THREE.BufferAttribute(bgStarSize, 1));
+    bgStarGeo.setAttribute('aPhase', new THREE.BufferAttribute(bgStarPhase, 1));
+    bgStarGeo.setAttribute('aTint', new THREE.BufferAttribute(bgStarTint, 3));
+
+    const bgStarMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: `
+            attribute float aSize;
+            attribute float aPhase;
+            attribute vec3 aTint;
+            uniform float uTime;
+            varying vec3 vTint;
+            varying float vTwinkle;
+            void main() {
+                vTint = aTint;
+                // Titileo suave: la mayoría casi constante, con un parpadeo
+                // ocasional leve — evita que se vea "ruidoso" o distraiga.
+                vTwinkle = 0.75 + sin(uTime * 0.6 + aPhase) * 0.25;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = aSize * (140.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vTint;
+            varying float vTwinkle;
+            void main() {
+                vec2 uv = gl_PointCoord - 0.5;
+                float d = length(uv) * 2.0;
+                float glow = pow(clamp(1.0 - d, 0.0, 1.0), 2.2);
+                gl_FragColor = vec4(vTint, glow * vTwinkle * 0.85);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.AdditiveBlending
+    });
+
+    galaxyBackgroundStars = new THREE.Points(bgStarGeo, bgStarMat);
+    galaxyBackgroundStars.frustumCulled = false;
+    galaxyScene.add(galaxyBackgroundStars);
+
     // Mantenemos las 6 estrellas principales interactuables, pero ya NO como
     // Sprite: las capturas mostraron que también sufrían el bug (aunque más
     // disimulado, como un recorte en forma de "D" en vez de un chorro).
@@ -7030,6 +7117,12 @@ function tick() {
         if (nearDustParticles) {
             nearDustParticles.rotation.y = time * 0.02;
             nearDustParticles.rotation.x = time * 0.01;
+        }
+
+        if (galaxyBackgroundStars) {
+            galaxyBackgroundStars.material.uniforms.uTime.value = time;
+            // Rotación casi imperceptible para que no se sienta "pegado"
+            galaxyBackgroundStars.rotation.y = time * 0.0025;
         }
 
         if (galaxyStreakField) {
