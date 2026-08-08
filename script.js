@@ -5783,33 +5783,6 @@ function createCircleTexture() {
 }
 const starTexture = createCircleTexture();
 
-function createAsteroidFlareTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    const cx = 128, cy = 128;
-
-    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80);
-    core.addColorStop(0, 'rgba(255,255,255,1)');
-    core.addColorStop(0.2, 'rgba(180,230,255,0.9)');
-    core.addColorStop(0.5, 'rgba(40,150,255,0.4)');
-    core.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = core;
-    ctx.fillRect(0,0,256,256);
-
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = 'rgba(80, 180, 255, 0.6)';
-    ctx.beginPath(); ctx.ellipse(cx, cy, 110, 4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx, cy, 4, 110, 0, 0, Math.PI * 2); ctx.fill();
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    return texture;
-}
-const asteroidFlareTexture = createAsteroidFlareTexture();
-
 function createNebulaTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 128; canvas.height = 128;
@@ -5825,6 +5798,7 @@ function createNebulaTexture() {
     return texture;
 }
 
+// --- AURA PARA EL NÚCLEO Y 6 ESTRELLAS ---
 function createAuraTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512; 
@@ -5832,7 +5806,7 @@ function createAuraTexture() {
     const ctx = canvas.getContext('2d');
     const cx = 256, cy = 256;
 
-    // Resplandor radial volumétrico súper suave (sin rayas ni "estrellas de cartón")
+    // Resplandor radial volumétrico súper suave
     const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
     gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
     gradient.addColorStop(0.08, 'rgba(255, 248, 220, 0.90)');
@@ -5850,6 +5824,7 @@ function createAuraTexture() {
 }
 const auraTexture = createAuraTexture();
 
+// --- AURA PARA LA ESTRELLA AZUL SECRETA ---
 function createBlueSecretAuraTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -5875,9 +5850,11 @@ function createBlueSecretAuraTexture() {
 }
 const blueSecretAuraTexture = createBlueSecretAuraTexture();
 
+// --- ESTRELLA PURA (sin los aros extraños) ---
 function createAsteroidFlareTexture() {
-    return starTexture; // Usamos el círculo puro original para la estrella en sí
+    return starTexture; // Reutilizamos el círculo perfecto
 }
+const asteroidFlareTexture = createAsteroidFlareTexture();
 const asteroidFlareTexture = createAsteroidFlareTexture();
 
 function createGalaxyStreakTexture() {
