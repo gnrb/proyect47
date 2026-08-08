@@ -9224,7 +9224,19 @@ function getPointerInElement(event, element) {
 function getGalaxyRenderSize() {
     const canvas = document.getElementById('galaxy-canvas');
 
-    if (isMobilePortraitSafe() && canvas) {
+    // FIX CHORROS DE LUZ EN LANDSCAPE MÓVIL (intento 2):
+    // Antes esta medición precisa (el tamaño real del propio <canvas>, vía
+    // getBoundingClientRect) solo se usaba en portrait (isMobilePortraitSafe).
+    // En landscape caía a getAppSize(), que mide el CONTENEDOR de la app, no
+    // el canvas. Si esos dos tamaños no coinciden exactamente en algún
+    // dispositivo/navegador, camera.aspect (que se calcula con este ancho/
+    // alto) queda desalineado del aspect ratio real con el que el canvas se
+    // pinta en pantalla. Los puntos (la nube de partículas de la galaxia) no
+    // se ven afectados por ese desajuste, pero los Sprites (núcleo y
+    // estrellas) sí — se estiran, exactamente el patrón del bug reportado
+    // (disco bien, núcleo/estrellas con chorro). Ahora usamos siempre la
+    // medición del canvas real, en cualquier orientación.
+    if (canvas) {
         const rect = canvas.getBoundingClientRect();
 
         if (rect.width > 0 && rect.height > 0) {
@@ -9237,6 +9249,38 @@ function getGalaxyRenderSize() {
 
     return getAppSize();
 }
+
+// --- LECTOR DE DIAGNÓSTICO (solo con ?debug=1 en la URL) ---
+// Muestra en pantalla los números reales que está usando la galaxia
+// (aspect de cámara, tamaño del canvas, tamaño del contenedor) para poder
+// comparar sin necesidad de conectar el celular a un computador.
+function initGalaxyDebugOverlay() {
+    if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
+
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.75);color:#0f0;font:11px monospace;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre;';
+    document.body.appendChild(el);
+
+    setInterval(() => {
+        if (currentWorld !== 1 || !galaxyCamera || !galaxyRenderer) {
+            el.textContent = 'Mundo 1 no activo';
+            return;
+        }
+        const canvas = document.getElementById('galaxy-canvas');
+        const rect = canvas.getBoundingClientRect();
+        const app = getAppSize();
+        const drawBuf = { w: galaxyRenderer.domElement.width, h: galaxyRenderer.domElement.height };
+        el.textContent =
+            `camera.aspect: ${galaxyCamera.aspect.toFixed(4)}\n` +
+            `canvas rect:   ${rect.width.toFixed(1)} x ${rect.height.toFixed(1)} (aspect ${(rect.width/rect.height).toFixed(4)})\n` +
+            `app-wrapper:   ${app.width} x ${app.height} (aspect ${(app.width/app.height).toFixed(4)})\n` +
+            `drawingBuffer: ${drawBuf.w} x ${drawBuf.h}\n` +
+            `innerW/H:      ${window.innerWidth} x ${window.innerHeight}\n` +
+            `devicePixelRatio: ${window.devicePixelRatio}`;
+    }, 500);
+}
+document.addEventListener('DOMContentLoaded', initGalaxyDebugOverlay);
+if (document.readyState !== 'loading') initGalaxyDebugOverlay();
 
 function refreshSeguroResponsiveHitboxes() {
     if (
