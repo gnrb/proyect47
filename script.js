@@ -5758,6 +5758,8 @@ let galaxyNebulaGroup = null;
 let galaxyDustLaneGroup = null;
 let galaxyCoreGlowGroup = null;
 let galaxyCoreFlareGroup = null;
+let galaxyGlowPoints = null;
+let galaxyGlowPointDefs = [];
 let galaxyVignetteGrainPass = null;
 let galaxyMistGroup = null;
 let galaxyStarFormingGroup = null;
@@ -5768,82 +5770,18 @@ let coreMesh;
 let blueSecretUnlocked = false; 
 let valeskaAsteroidRevealed = false; // guard: evita abrir la ficha si ya está abierta
 
-// ==========================================================================
-// GENERADOR DE TEXTURAS RADIALES SIN createRadialGradient
-// ==========================================================================
-// Por qué existe esto: en el S24 FE (GPU Xclipse/Exynos — arquitectura
-// bastante nueva e inmadura en el ecosistema Android, con antecedentes de
-// bugs de driver que no aparecen en Adreno/Mali) las texturas generadas con
-// context.createRadialGradient() se estaban subiendo a WebGL con una
-// silueta corrupta (una muesca cóncava consistente, no un artefacto de
-// bloom ni de compresión — se confirmó igual en capturas nativas sin
-// WhatsApp de por medio). No importa el mecanismo exacto del bug del
-// driver: la forma más robusta de evitarlo es no usar ese camino de código
-// en absoluto. Esta función calcula cada píxel a mano con matemática pura
-// en CPU (createImageData/putImageData) — un camino de renderizado
-// completamente distinto que no depende del rasterizador de gradientes
-// del navegador/GPU.
-//
-// `stops` es un array de paradas de color ordenadas por offset ascendente
-// (0..1), cada una {offset, r, g, b, a}, interpoladas linealmente — el
-// mismo concepto que los color stops de un CanvasGradient, pero calculados
-// a mano.
-function createRadialTextureFromStops(size, cx, cy, radius, stops) {
+function createCircleTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(size, size);
-    const data = imageData.data;
-
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const dx = x + 0.5 - cx;
-            const dy = y + 0.5 - cy;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const t = Math.min(dist / radius, 1);
-
-            let s0 = stops[0];
-            let s1 = stops[stops.length - 1];
-            for (let i = 0; i < stops.length - 1; i++) {
-                if (t >= stops[i].offset && t <= stops[i + 1].offset) {
-                    s0 = stops[i];
-                    s1 = stops[i + 1];
-                    break;
-                }
-            }
-            const span = (s1.offset - s0.offset) || 1;
-            const localT = Math.min(Math.max((t - s0.offset) / span, 0), 1);
-
-            const r = s0.r + (s1.r - s0.r) * localT;
-            const g = s0.g + (s1.g - s0.g) * localT;
-            const b = s0.b + (s1.b - s0.b) * localT;
-            const a = s0.a + (s1.a - s0.a) * localT;
-
-            const i4 = (y * size + x) * 4;
-            data[i4] = r;
-            data[i4 + 1] = g;
-            data[i4 + 2] = b;
-            data[i4 + 3] = Math.round(a * 255);
-        }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
+    canvas.width = 128; canvas.height = 128; 
+    const context = canvas.getContext('2d');
+    context.beginPath(); 
+    context.arc(64, 64, 45, 0, Math.PI * 2); // Margen gigante de seguridad
+    context.fillStyle = '#ffffff'; 
+    context.fill();
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     return texture;
-}
-
-function createCircleTexture() {
-    // Núcleo sólido hasta 82% del radio, últimos 18% se apagan a 0 — mismo
-    // perfil que antes, ahora sin createRadialGradient.
-    return createRadialTextureFromStops(128, 64, 64, 45, [
-        { offset: 0.00, r: 255, g: 255, b: 255, a: 1 },
-        { offset: 0.82, r: 255, g: 255, b: 255, a: 1 },
-        { offset: 1.00, r: 255, g: 255, b: 255, a: 0 }
-    ]);
 }
 const starTexture = createCircleTexture();
 
@@ -5888,39 +5826,52 @@ function createNebulaTexture() {
 }
 
 function createAuraTexture() {
-    // Réplica del degradado principal original (5 paradas). Se omite la
-    // segunda capa "anillo" con blend 'screen' que tenía el original — su
-    // alpha máximo era 0.045 (casi imperceptible) y también dependía de
-    // createRadialGradient; la diferencia visual de quitarla es mínima.
-    return createRadialTextureFromStops(256, 128, 128, 110, [
-        { offset: 0.00, r: 255, g: 248, b: 220, a: 0.92 },
-        { offset: 0.12, r: 255, g: 235, b: 180, a: 0.60 },
-        { offset: 0.30, r: 255, g: 210, b: 130, a: 0.24 },
-        { offset: 0.55, r: 255, g: 180, b:  90, a: 0.09 },
-        { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
-    ]);
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 110);
+    gradient.addColorStop(0.00, 'rgba(255, 248, 220, 0.92)');
+    gradient.addColorStop(0.12, 'rgba(255, 235, 180, 0.60)');
+    gradient.addColorStop(0.30, 'rgba(255, 210, 130, 0.24)');
+    gradient.addColorStop(0.55, 'rgba(255, 180,  90, 0.09)');
+    gradient.addColorStop(1.00, 'rgba(0,0,0,0)'); 
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+
+    ctx.globalCompositeOperation = 'screen';
+    const ringGrad = ctx.createRadialGradient(128, 128, 38, 128, 128, 96);
+    ringGrad.addColorStop(0.0,  'rgba(255, 255, 255, 0)');
+    ringGrad.addColorStop(0.45, 'rgba(255, 240, 200, 0.045)');
+    ringGrad.addColorStop(1.0,  'rgba(255,255,255,0)');
+    ctx.fillStyle = ringGrad; ctx.fillRect(0, 0, 256, 256);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
 }
 const auraTexture = createAuraTexture();
 
-function createBlueSecretAuraTexture(saturated = false) {
-    if (saturated) {
-        // MÓVIL: núcleo blanco más chico + azul más dominante/saturado
-        // desde antes en el degradado (ver nota en el uso más abajo).
-        return createRadialTextureFromStops(192, 96, 96, 80, [
-            { offset: 0.00, r: 255, g: 255, b: 255, a: 0.40 },
-            { offset: 0.10, r: 80,  g: 190, b: 255, a: 0.55 },
-            { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
-        ]);
-    }
-    return createRadialTextureFromStops(192, 96, 96, 80, [
-        { offset: 0.00, r: 255, g: 255, b: 255, a: 0.52 },
-        { offset: 0.16, r: 120, g: 215, b: 255, a: 0.30 },
-        { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
-    ]);
-}
-const blueSecretAuraTexture = createBlueSecretAuraTexture(false);
-const blueSecretAuraTextureMobile = createBlueSecretAuraTexture(true);
+function createBlueSecretAuraTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 192; canvas.height = 192;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 192, 192);
+    ctx.globalCompositeOperation = 'lighter';
 
+    const base = ctx.createRadialGradient(96, 96, 0, 96, 96, 80);
+    base.addColorStop(0.00, 'rgba(255,255,255,0.52)');
+    base.addColorStop(0.16, 'rgba(120,215,255,0.30)');
+    base.addColorStop(1.00, 'rgba(0,0,0,0)');
+    ctx.fillStyle = base; ctx.fillRect(0, 0, 192, 192);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
+}
+const blueSecretAuraTexture = createBlueSecretAuraTexture();
 
 function createGalaxyStreakTexture() {
     const canvas = document.createElement('canvas');
@@ -6380,73 +6331,7 @@ function updateGalaxyCameraFraming() {
     }
 }
 
-// ==========================================================================
-// RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL: "GLOW POINTS"
-// ==========================================================================
-// Por qué existe esto: en landscape de celular (aspect ~2:1, alto CSS muy
-// corto) el núcleo y las auras (THREE.Sprite) seguían mostrando el
-// "chorro/geíser" vertical incluso después de sincronizar el aspect de la
-// cámara con el del composer. En cambio el disco de partículas (que usa
-// gl_PointSize, un tamaño en píxeles ISOTRÓPICO — igual en X y en Y sin
-// pasar por el mismo camino de la projectionMatrix que usa un Sprite) nunca
-// mostró el bug, en ninguna prueba, en ningún celular.
-//
-// En vez de seguir cazando la causa exacta dentro del driver/GPU del
-// teléfono (algo que no podemos reproducir aquí sin el dispositivo real),
-// movemos el núcleo y las auras al MISMO mecanismo que ya sabemos que es
-// inmune: THREE.PointsMaterial con sizeAttenuation, que internamente
-// también dimensiona vía gl_PointSize (igual que el polvo cercano
-// `nearDustParticles`, que ya usa este mismo material en este archivo sin
-// problema). Un solo vértice en el origen + `size` en unidades de mundo
-// (equivalente directo al `sprite.scale` que ya usábamos).
-//
-// Solo se usa en móvil (isMobile): en desktop el Sprite nunca mostró el
-// problema, así que ahí se deja tal cual estaba.
-//
-// OJO — límite conocido: gl_PointSize tiene un tope que impone la GPU
-// (gl.ALIASED_POINT_SIZE_RANGE). En GPUs de escritorio suele ser altísimo,
-// pero en algunas GPUs móviles puede ser más bajo. Dejamos un log en
-// consola (buscar "🔵 Punto máximo") para poder confirmarlo en el celular
-// real; si algún día el núcleo se ve "cortado" en vez de suave, ese es el
-// primer sospechoso.
-function createGalaxyGlowPoints(texture, colorHex, opacity, size) {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-
-    const material = new THREE.PointsMaterial({
-        map: texture,
-        color: new THREE.Color(colorHex),
-        size: size,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: opacity,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        depthTest: false
-    });
-
-    const points = new THREE.Points(geometry, material);
-    // Igual que con los Sprites: la posición real puede quedar fuera del
-    // único vértice dummy en el origen si el objeto se mueve, así que
-    // evitamos que el frustum culling automático (basado en ese vértice)
-    // lo recorte por error.
-    points.frustumCulled = false;
-    return points;
-}
-
-function logGalaxyMaxPointSize() {
-    try {
-        const gl = galaxyRenderer.getContext();
-        const range = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE);
-        console.log('🔵 Punto máximo soportado por esta GPU (gl_PointSize):', range);
-    } catch (error) {
-        console.warn('No se pudo leer ALIASED_POINT_SIZE_RANGE:', error);
-    }
-}
-
 function initGalaxy() {
-
-
     if (galaxyInitialized) return; 
     
     const canvas = document.querySelector('#galaxy-canvas');
@@ -6475,40 +6360,133 @@ function initGalaxy() {
     const unifiedGalaxy = createUnifiedGalaxy(parameters, isMobile, isHighEndMobile);
     galaxyScene.add(unifiedGalaxy);
 
-    // === DESTELLO DE LENTE EN EL NÚCLEO (EL CUÁSAR ESFÉRICO) ===
-    galaxyCoreFlareGroup = new THREE.Group();
-    const flareGhosts = [
-        { dist: 0,    scale: 3.5, opacity: 0.85, color: '#ffffff' }, // Unificado como en PC
-        { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' }  // Unificado como en PC
-    ];
-    flareGhosts.forEach((g, i) => {
-        let sprite;
+    // === RECONSTRUCCIÓN: NÚCLEO + AURAS COMO THREE.Points ===
+    // Antes esto eran THREE.Sprite (billboards). En el S24 FE en landscape
+    // mostraban un "chorro" vertical que se confirmó (con pruebas en vivo:
+    // A/B toggle de bloom y de estos sprites por separado) que SOLO ocurre
+    // en este grupo de objetos, incluso sin bloom — algo específico de
+    // cómo ese driver/GPU maneja Sprite en este proyecto. La nube de
+    // partículas del disco (GalaxyPhysicsSim, también Points) NUNCA mostró
+    // el bug en ningún dispositivo probado, así que reconstruimos el
+    // núcleo y las auras con esa misma técnica en vez de seguir parchando
+    // Sprite. Los puntos definidos aquí reemplazan tanto a "flareGhosts"
+    // (núcleo) como a "interactiveStarAuras" (las 6 estrellas).
+    const GLOW_POINT_SCALE_FACTOR = 600; // ajustar aquí si el tamaño se ve mal
 
-        if (isMobile) {
-            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
-            sprite = createGalaxyGlowPoints(auraTexture, g.color, g.opacity, g.scale);
-        } else {
-            const mat = new THREE.SpriteMaterial({
-                map: auraTexture,
-                color: new THREE.Color(g.color),
-                blending: THREE.AdditiveBlending,
-                transparent: true,
-                opacity: g.opacity,
-                depthWrite: false
-            });
-            sprite = new THREE.Sprite(mat);
-            sprite.scale.set(g.scale, g.scale, 1);
-        }
-
-        sprite.userData = {
-            dist: g.dist,
-            baseOpacity: g.opacity,
-            phase: Math.random() * Math.PI * 2,
-            isGhost: i > 0
-        };
-        galaxyCoreFlareGroup.add(sprite);
+    galaxyGlowPointDefs = [];
+    // Núcleo (2 capas, igual que antes: blanco compacto + halo naranja)
+    galaxyGlowPointDefs.push({
+        kind: 'ghost', position: new THREE.Vector3(0, 0, 0),
+        baseSize: 3.5, color: new THREE.Color('#ffffff'),
+        baseOpacity: 0.85, phase: Math.random() * Math.PI * 2
     });
-    galaxyScene.add(galaxyCoreFlareGroup);
+    galaxyGlowPointDefs.push({
+        kind: 'ghost', position: new THREE.Vector3(0, 0, 0),
+        baseSize: 4.8, color: new THREE.Color('#ff9900'),
+        baseOpacity: 0.35, phase: Math.random() * Math.PI * 2
+    });
+
+    // Las 6 auras de estrellas (mismas posiciones/paleta/tamaños que antes)
+    const auraPalette = ['#ffd890', '#fff5d8', '#e8d0ff', '#ffc868', '#d8f0ff', '#ffe0b0'];
+    const auraBaseSize = isHighEndMobile ? 1.72 : 1.45;
+    const starGlowIndexByStar = []; // índice en galaxyGlowPointDefs del punto brillante de cada estrella
+    for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI * 2 / 6) * i;
+        const radius = 2.5 + Math.random();
+        const y = (Math.random() - 0.5) * 1.5;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+
+        galaxyGlowPointDefs.push({
+            kind: 'aura', position: new THREE.Vector3(x, y, z),
+            baseSize: auraBaseSize, color: new THREE.Color(auraPalette[i % auraPalette.length]),
+            baseOpacity: isHighEndMobile ? 0.68 : 0.58,
+            phase: Math.random() * Math.PI * 2,
+            shimmerPhase: Math.random() * Math.PI * 2,
+            pulseSpeed: 1.2 + Math.random() * 0.8,
+            starIndex: i // para que las estrellas (interactiveStars) sigan sabiendo cuál es su aura
+        });
+    }
+
+    // FIX ADICIONAL: las capturas más recientes (S24 FE) mostraron que, con
+    // el chorro del núcleo/auras ya resuelto, las 6 estrellitas clickeables
+    // (que seguían siendo Sprite) ahora se ven como una forma tipo "D" /
+    // recortada — confirma que el problema es Sprite en sí en ese GPU, no
+    // solo su tamaño. Por eso el punto brillante de cada estrella también
+    // pasa a este mismo sistema de Points; la malla que queda para detectar
+    // el toque (más abajo) es invisible.
+    for (let i = 0; i < 6; i++) {
+        starGlowIndexByStar.push(galaxyGlowPointDefs.length);
+        galaxyGlowPointDefs.push({
+            kind: 'star', position: galaxyGlowPointDefs[2 + i].position.clone(),
+            baseSize: 0.55, color: new THREE.Color('#ffffff'),
+            baseOpacity: 1.0,
+            phase: Math.random() * Math.PI * 2,
+            starIndex: i
+        });
+    }
+
+    const glowCount = galaxyGlowPointDefs.length;
+    const glowGeo = new THREE.BufferGeometry();
+    const glowPos = new Float32Array(glowCount * 3);
+    const glowColor = new Float32Array(glowCount * 3);
+    const glowSize = new Float32Array(glowCount);
+    const glowOpacity = new Float32Array(glowCount);
+
+    galaxyGlowPointDefs.forEach((d, i) => {
+        glowPos[i * 3 + 0] = d.position.x;
+        glowPos[i * 3 + 1] = d.position.y;
+        glowPos[i * 3 + 2] = d.position.z;
+        glowColor[i * 3 + 0] = d.color.r;
+        glowColor[i * 3 + 1] = d.color.g;
+        glowColor[i * 3 + 2] = d.color.b;
+        glowSize[i] = d.baseSize;
+        glowOpacity[i] = d.baseOpacity;
+    });
+
+    glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
+    glowGeo.setAttribute('aColor', new THREE.BufferAttribute(glowColor, 3));
+    glowGeo.setAttribute('aSize', new THREE.BufferAttribute(glowSize, 1));
+    glowGeo.setAttribute('aOpacity', new THREE.BufferAttribute(glowOpacity, 1));
+
+
+
+    const glowMat = new THREE.ShaderMaterial({
+        uniforms: { uScaleFactor: { value: GLOW_POINT_SCALE_FACTOR } },
+        vertexShader: `
+            attribute float aSize;
+            attribute float aOpacity;
+            attribute vec3 aColor;
+            uniform float uScaleFactor;
+            varying vec3 vColor;
+            varying float vOpacity;
+            void main() {
+                vColor = aColor;
+                vOpacity = aOpacity;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = aSize * (uScaleFactor / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vColor;
+            varying float vOpacity;
+            void main() {
+                vec2 uv = gl_PointCoord - 0.5;
+                float d = length(uv) * 2.0;
+                float glow = pow(clamp(1.0 - d, 0.0, 1.0), 1.6);
+                gl_FragColor = vec4(vColor, glow * vOpacity);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending
+    });
+
+    galaxyGlowPoints = new THREE.Points(glowGeo, glowMat);
+    galaxyGlowPoints.frustumCulled = false;
+    galaxyScene.add(galaxyGlowPoints);
 
     // Mantenemos los meteoritos de estelas
     galaxyStreakField = createGalaxyStreakField(parameters, isMobile, isHighEndMobile);
@@ -6538,69 +6516,27 @@ function initGalaxy() {
     nearDustParticles = new THREE.Points(dustGeo, dustMat);
     galaxyScene.add(nearDustParticles);
 
-    // Mantenemos las 6 estrellas principales interactuables
-    const starMat = new THREE.SpriteMaterial({
-        map: starTexture,
-        color: 0xffffff,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 1,
-        depthWrite: false,
-        depthTest: false 
-    });
-    
+    // Mantenemos las 6 estrellas principales interactuables, pero ya NO como
+    // Sprite: las capturas mostraron que también sufrían el bug (aunque más
+    // disimulado, como un recorte en forma de "D" en vez de un chorro).
+    // Una esfera nunca necesita orientarse hacia la cámara, así que no puede
+    // sufrir ese problema. Es invisible (solo existe para el raycasting del
+    // toque); el brillo visible de la estrella lo pone galaxyGlowPoints.
+    const starHitGeometry = new THREE.SphereGeometry(0.16, 8, 8);
+    const starHitMaterial = new THREE.MeshBasicMaterial({ visible: false });
+
     for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 / 6) * i;
-        const radius = 2.5 + Math.random();
-        const y = (Math.random() - 0.5) * 1.5;
+        const auraDef = galaxyGlowPointDefs[2 + i]; // las 6 auras están en índices 2..7
+        const x = auraDef.position.x;
+        const y = auraDef.position.y;
+        const z = auraDef.position.z;
 
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
-
-        const auraPalette = [
-            '#ffd890', '#fff5d8', '#e8d0ff', 
-            '#ffc868', '#d8f0ff', '#ffe0b0'
-        ];
-
-        const auraColor = auraPalette[i % auraPalette.length];
-        const auraOpacity = isHighEndMobile ? 0.68 : 0.58;
-        const auraSize = isHighEndMobile ? 1.72 : 1.45;
-
-        let aura;
-        if (isMobile) {
-            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
-            aura = createGalaxyGlowPoints(auraTexture, auraColor, auraOpacity, auraSize);
-        } else {
-            const auraMaterial = new THREE.SpriteMaterial({
-                map: auraTexture,
-                color: new THREE.Color(auraColor),
-                blending: THREE.AdditiveBlending,
-                transparent: true,
-                opacity: auraOpacity,
-                depthWrite: false,
-                depthTest: false
-            });
-            aura = new THREE.Sprite(auraMaterial);
-            aura.scale.set(auraSize, auraSize, 1);
-        }
-
-        aura.position.set(x, y, z);
-        aura.userData = {
-            baseScale: auraSize,
-            phase: Math.random() * Math.PI * 2,
-            shimmerPhase: Math.random() * Math.PI * 2,
-            pulseSpeed: 1.2 + Math.random() * 0.8   
-        };
-
-        galaxyScene.add(aura);
-        interactiveStarAuras.push(aura);
-
-        const star = new THREE.Sprite(starMat.clone());
-        star.scale.set(0.17, 0.17, 1);
+        const star = new THREE.Mesh(starHitGeometry, starHitMaterial);
         star.position.set(x, y, z);
         star.userData = {
             id: i,
-            aura
+            auraDef, // referencia al punto de brillo correspondiente
+            glowIndex: starGlowIndexByStar[i] // índice del punto brillante propio de esta estrella
         };
 
         galaxyScene.add(star);
@@ -6608,62 +6544,28 @@ function initGalaxy() {
     }
 
     // --- ESTRELLA AZUL SECRETA ---
-    // El aura (blueSecretAura) NO es clicable — se puede migrar a Points sin
-    // ningún riesgo, igual que el núcleo y las auras normales. Se pierde el
-    // detalle elíptico (Points solo admite un tamaño escalar), pero a cambio
-    // deja de "desaparecer"/aplastarse por la misma distorsión de aspect que
-    // afectaba a los Sprites grandes.
-    const blueAuraOpacity = isHighEndMobile ? 0.48 : 0.40;
-    const blueAuraSizeX = isHighEndMobile ? 1.95 : 1.68;
-    const blueAuraSizeY = isHighEndMobile ? 1.52 : 1.36;
+    const blueAuraMaterial = new THREE.SpriteMaterial({
+        map: blueSecretAuraTexture,
+        color: new THREE.Color('#7edcff'),
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: isHighEndMobile ? 0.48 : 0.40,
+        depthWrite: false
+    });
 
-    if (isMobile) {
-        blueSecretAura = createGalaxyGlowPoints(
-            blueSecretAuraTextureMobile,
-            '#4dd2ff',
-            blueAuraOpacity,
-            (blueAuraSizeX + blueAuraSizeY) / 2 // se pierde la elipse, promedio razonable
-        );
-    } else {
-        const blueAuraMaterial = new THREE.SpriteMaterial({
-            map: blueSecretAuraTexture,
-            color: new THREE.Color('#7edcff'),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: blueAuraOpacity,
-            depthWrite: false
-        });
-        blueSecretAura = new THREE.Sprite(blueAuraMaterial);
-        blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
-    }
-
+    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
+    blueSecretAura.scale.set(isHighEndMobile ? 1.95 : 1.68, isHighEndMobile ? 1.52 : 1.36, 1);
     blueSecretAura.userData = {
-        baseScale: blueAuraSizeX,
-        baseScaleY: blueAuraSizeY,
+        baseScale: isHighEndMobile ? 1.95 : 1.68,
+        baseScaleY: isHighEndMobile ? 1.52 : 1.36,
         phase: Math.random() * Math.PI * 2
     };
     galaxyScene.add(blueSecretAura);
 
-    // blueSecretStar SÍ es clicable (raycaster más abajo) — se queda como
-    // Sprite siempre, para no tocar esa lógica. Lo que cambia es la textura:
-    // asteroidFlareTexture tiene una cruz de destello dibujada a mano (dos
-    // elipses, una horizontal y una vertical) directamente en el PNG. En
-    // desktop esa cruz siempre se vio bien, pero en el aspect extremo de
-    // celular landscape es justo lo que se estira en un "geíser" vertical.
-    // En móvil usamos starTexture (el mismo círculo suave de las estrellas
-    // normales, ya confirmado sin artefactos) — el color celeste sigue
-    // distinguiéndola, y la rotación de abajo (material.rotation) queda
-    // como no-op inofensivo sobre un círculo.
-    //
-    // Color más saturado en móvil (#33c8ff vs #99d6ff en desktop): el
-    // bloom en móvil corre a menor resolución (GALAXY_BLOOM_MIN_HEIGHT),
-    // así que diluye más luz blanca/dorada del disco cercano sobre la
-    // estrella. Un azul más "puro" desde el origen sobrevive mejor esa
-    // mezcla en vez de leerse casi blanca.
     const blueStarMaterial = new THREE.SpriteMaterial({
-        map: isMobile ? starTexture : asteroidFlareTexture,
-        color: new THREE.Color(isMobile ? '#33c8ff' : '#99d6ff'),
+        map: asteroidFlareTexture, // Usamos el nuevo destello
+        color: new THREE.Color('#99d6ff'), // Un azul un poco más vibrante
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 1,
@@ -6679,7 +6581,6 @@ function initGalaxy() {
     };
 
     galaxyScene.add(blueSecretStar);
-
 
     // Hitbox invisible del Agujero Negro
     const coreGeometry = new THREE.SphereGeometry(0.8, 16, 16);
@@ -6699,10 +6600,6 @@ function initGalaxy() {
     galaxyRenderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: false, premultipliedAlpha: false });
     galaxyRenderer.setSize(sizes.width, sizes.height);
     galaxyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
-
-    if (isMobile) {
-        logGalaxyMaxPointSize();
-    }
 
     galaxyRenderer.toneMapping = THREE.ACESFilmicToneMapping;
     galaxyRenderer.toneMappingExposure = 1.15;
@@ -7124,32 +7021,37 @@ function tick() {
         });
         }
 
-        interactiveStarAuras.forEach((aura, index) => {
-            const speed = aura.userData.pulseSpeed || 1.5;
-            const shimmerSpeed = speed * 2.8;
-            // Pulso principal suave
-            const pulse = Math.sin(time * speed + aura.userData.phase) * 0.22;
-            // Shimmer rápido de baja amplitud encima del pulso
-            const shimmer = Math.sin(time * shimmerSpeed + (aura.userData.shimmerPhase || 0)) * 0.06;
-            const scale = aura.userData.baseScale + pulse + shimmer;
-            // aura.scale afecta al Sprite (desktop). aura.material.size afecta
-            // al Points (móvil, ver createGalaxyGlowPoints) — como el vértice
-            // vive en el origen local, tocar aura.scale ahí no hace nada, así
-            // que fijamos ambos y cada tipo de objeto usa el que le aplica.
-            aura.scale.set(scale, scale, 1);
-            if (aura.material.size !== undefined) aura.material.size = scale;
-            // Opacidad: varía en dos frecuencias para efecto "respiración mística"
-            const opBase = 0.52 + Math.sin(time * speed * 0.7 + aura.userData.phase) * 0.15;
-            const opShimmer = Math.sin(time * shimmerSpeed * 0.5 + index) * 0.075;
-            aura.material.opacity = Math.max(0.28, Math.min(0.84, opBase + opShimmer));
-        });
+        if (galaxyGlowPoints && galaxyGlowPointDefs.length) {
+            const sizeAttr = galaxyGlowPoints.geometry.attributes.aSize;
+            const opAttr = galaxyGlowPoints.geometry.attributes.aOpacity;
 
-        // Respiración muy sutil del destello de lente del núcleo
-        if (galaxyCoreFlareGroup) {
-            galaxyCoreFlareGroup.children.forEach((sprite) => {
-                const wave = Math.sin(time * 0.6 + sprite.userData.phase);
-                sprite.material.opacity = Math.max(0, sprite.userData.baseOpacity + wave * sprite.userData.baseOpacity * 0.25);
+            galaxyGlowPointDefs.forEach((d, index) => {
+                if (d.kind === 'aura') {
+                    const speed = d.pulseSpeed || 1.5;
+                    const shimmerSpeed = speed * 2.8;
+                    // Pulso principal suave
+                    const pulse = Math.sin(time * speed + d.phase) * 0.22;
+                    // Shimmer rápido de baja amplitud encima del pulso
+                    const shimmer = Math.sin(time * shimmerSpeed + (d.shimmerPhase || 0)) * 0.06;
+                    sizeAttr.array[index] = d.baseSize + pulse + shimmer;
+                    // Opacidad: varía en dos frecuencias para efecto "respiración mística"
+                    const opBase = 0.52 + Math.sin(time * speed * 0.7 + d.phase) * 0.15;
+                    const opShimmer = Math.sin(time * shimmerSpeed * 0.5 + d.starIndex) * 0.075;
+                    opAttr.array[index] = Math.max(0.28, Math.min(0.84, opBase + opShimmer));
+                } else if (d.kind === 'star') {
+                    // Titileo sutil del punto brillante de la estrella
+                    const twinkle = Math.sin(time * 3.2 + d.phase) * 0.08;
+                    sizeAttr.array[index] = d.baseSize + twinkle;
+                    opAttr.array[index] = Math.max(0.7, Math.min(1.0, d.baseOpacity + twinkle));
+                } else {
+                    // Respiración muy sutil del destello de lente del núcleo
+                    const wave = Math.sin(time * 0.6 + d.phase);
+                    opAttr.array[index] = Math.max(0, d.baseOpacity + wave * d.baseOpacity * 0.25);
+                }
             });
+
+            sizeAttr.needsUpdate = true;
+            opAttr.needsUpdate = true;
         }
 
         if (galaxyVignetteGrainPass) {
@@ -7161,13 +7063,7 @@ function tick() {
             const pulse = Math.sin(time * 1.65 + blueSecretAura.userData.phase) * 0.10;
             const scaleX = blueSecretAura.userData.baseScale + pulse;
             const scaleY = (blueSecretAura.userData.baseScaleY || 1.28) + pulse * 0.58;
-            // scale.set afecta al Sprite (desktop, elíptico de verdad).
-            // material.size afecta al Points (móvil) — un solo escalar, así
-            // que usamos el promedio de X/Y como aproximación razonable.
             blueSecretAura.scale.set(scaleX, scaleY, 1);
-            if (blueSecretAura.material.size !== undefined) {
-                blueSecretAura.material.size = (scaleX + scaleY) / 2;
-            }
             blueSecretAura.material.opacity = 0.26 + Math.sin(time * 1.35) * 0.055;
         }
         
@@ -7212,9 +7108,21 @@ function tick() {
 
         const sizes = getAppSize();
 
+        const starGlowPosAttr = galaxyGlowPoints ? galaxyGlowPoints.geometry.attributes.position : null;
+
         interactiveStars.forEach(star => {
             // Restaurar la pequeña flotación natural
             star.position.y += Math.sin(time * 2 + star.userData.id) * 0.002;
+
+            // El punto brillante (galaxyGlowPoints) sigue la misma posición
+            // que la malla invisible de toque, para que el brillo y el área
+            // clickeable nunca se desalineen.
+            if (starGlowPosAttr && star.userData.glowIndex !== undefined) {
+                const gi = star.userData.glowIndex;
+                starGlowPosAttr.array[gi * 3 + 0] = star.position.x;
+                starGlowPosAttr.array[gi * 3 + 1] = star.position.y;
+                starGlowPosAttr.array[gi * 3 + 2] = star.position.z;
+            }
             
             star.getWorldPosition(_tmpVecStar);
             _tmpVecStar.project(galaxyCamera);
@@ -7232,6 +7140,8 @@ function tick() {
                 }
             }
         });
+
+        if (starGlowPosAttr) starGlowPosAttr.needsUpdate = true;
 
         const coreVector = new THREE.Vector3();
         coreMesh.getWorldPosition(coreVector); // Posición real
@@ -9492,12 +9402,9 @@ function initGalaxyDebugOverlay() {
     );
 
     makeToggleBtn(
-        'Núcleo+Auras',
-        () => !!(galaxyCoreFlareGroup && galaxyCoreFlareGroup.visible),
-        (v) => {
-            if (galaxyCoreFlareGroup) galaxyCoreFlareGroup.visible = v;
-            interactiveStarAuras.forEach(a => a.visible = v);
-        }
+        'Núcleo+Auras (Points)',
+        () => !!(galaxyGlowPoints && galaxyGlowPoints.visible),
+        (v) => { if (galaxyGlowPoints) galaxyGlowPoints.visible = v; }
     );
 
     setInterval(() => {
