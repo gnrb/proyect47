@@ -6329,7 +6329,73 @@ function updateGalaxyCameraFraming() {
     }
 }
 
+// ==========================================================================
+// RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL: "GLOW POINTS"
+// ==========================================================================
+// Por qué existe esto: en landscape de celular (aspect ~2:1, alto CSS muy
+// corto) el núcleo y las auras (THREE.Sprite) seguían mostrando el
+// "chorro/geíser" vertical incluso después de sincronizar el aspect de la
+// cámara con el del composer. En cambio el disco de partículas (que usa
+// gl_PointSize, un tamaño en píxeles ISOTRÓPICO — igual en X y en Y sin
+// pasar por el mismo camino de la projectionMatrix que usa un Sprite) nunca
+// mostró el bug, en ninguna prueba, en ningún celular.
+//
+// En vez de seguir cazando la causa exacta dentro del driver/GPU del
+// teléfono (algo que no podemos reproducir aquí sin el dispositivo real),
+// movemos el núcleo y las auras al MISMO mecanismo que ya sabemos que es
+// inmune: THREE.PointsMaterial con sizeAttenuation, que internamente
+// también dimensiona vía gl_PointSize (igual que el polvo cercano
+// `nearDustParticles`, que ya usa este mismo material en este archivo sin
+// problema). Un solo vértice en el origen + `size` en unidades de mundo
+// (equivalente directo al `sprite.scale` que ya usábamos).
+//
+// Solo se usa en móvil (isMobile): en desktop el Sprite nunca mostró el
+// problema, así que ahí se deja tal cual estaba.
+//
+// OJO — límite conocido: gl_PointSize tiene un tope que impone la GPU
+// (gl.ALIASED_POINT_SIZE_RANGE). En GPUs de escritorio suele ser altísimo,
+// pero en algunas GPUs móviles puede ser más bajo. Dejamos un log en
+// consola (buscar "🔵 Punto máximo") para poder confirmarlo en el celular
+// real; si algún día el núcleo se ve "cortado" en vez de suave, ese es el
+// primer sospechoso.
+function createGalaxyGlowPoints(texture, colorHex, opacity, size) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+
+    const material = new THREE.PointsMaterial({
+        map: texture,
+        color: new THREE.Color(colorHex),
+        size: size,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false
+    });
+
+    const points = new THREE.Points(geometry, material);
+    // Igual que con los Sprites: la posición real puede quedar fuera del
+    // único vértice dummy en el origen si el objeto se mueve, así que
+    // evitamos que el frustum culling automático (basado en ese vértice)
+    // lo recorte por error.
+    points.frustumCulled = false;
+    return points;
+}
+
+function logGalaxyMaxPointSize() {
+    try {
+        const gl = galaxyRenderer.getContext();
+        const range = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE);
+        console.log('🔵 Punto máximo soportado por esta GPU (gl_PointSize):', range);
+    } catch (error) {
+        console.warn('No se pudo leer ALIASED_POINT_SIZE_RANGE:', error);
+    }
+}
+
 function initGalaxy() {
+
+
     if (galaxyInitialized) return; 
     
     const canvas = document.querySelector('#galaxy-canvas');
@@ -6365,16 +6431,24 @@ function initGalaxy() {
         { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' }  // Unificado como en PC
     ];
     flareGhosts.forEach((g, i) => {
-        const mat = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(g.color),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: g.opacity,
-            depthWrite: false
-        });
-        const sprite = new THREE.Sprite(mat);
-        sprite.scale.set(g.scale, g.scale, 1);
+        let sprite;
+
+        if (isMobile) {
+            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
+            sprite = createGalaxyGlowPoints(auraTexture, g.color, g.opacity, g.scale);
+        } else {
+            const mat = new THREE.SpriteMaterial({
+                map: auraTexture,
+                color: new THREE.Color(g.color),
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                opacity: g.opacity,
+                depthWrite: false
+            });
+            sprite = new THREE.Sprite(mat);
+            sprite.scale.set(g.scale, g.scale, 1);
+        }
+
         sprite.userData = {
             dist: g.dist,
             baseOpacity: g.opacity,
@@ -6438,22 +6512,30 @@ function initGalaxy() {
         ];
 
         const auraColor = auraPalette[i % auraPalette.length];
+        const auraOpacity = isHighEndMobile ? 0.68 : 0.58;
+        const auraSize = isHighEndMobile ? 1.72 : 1.45;
 
-        const auraMaterial = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(auraColor),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: isHighEndMobile ? 0.68 : 0.58,
-            depthWrite: false,
-            depthTest: false
-        });
+        let aura;
+        if (isMobile) {
+            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
+            aura = createGalaxyGlowPoints(auraTexture, auraColor, auraOpacity, auraSize);
+        } else {
+            const auraMaterial = new THREE.SpriteMaterial({
+                map: auraTexture,
+                color: new THREE.Color(auraColor),
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                opacity: auraOpacity,
+                depthWrite: false,
+                depthTest: false
+            });
+            aura = new THREE.Sprite(auraMaterial);
+            aura.scale.set(auraSize, auraSize, 1);
+        }
 
-        const aura = new THREE.Sprite(auraMaterial);
         aura.position.set(x, y, z);
-        aura.scale.set(isHighEndMobile ? 1.72 : 1.45, isHighEndMobile ? 1.72 : 1.45, 1);
         aura.userData = {
-            baseScale: isHighEndMobile ? 1.72 : 1.45,
+            baseScale: auraSize,
             phase: Math.random() * Math.PI * 2,
             shimmerPhase: Math.random() * Math.PI * 2,
             pulseSpeed: 1.2 + Math.random() * 0.8   
@@ -6531,6 +6613,10 @@ function initGalaxy() {
     galaxyRenderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: false, premultipliedAlpha: false });
     galaxyRenderer.setSize(sizes.width, sizes.height);
     galaxyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
+
+    if (isMobile) {
+        logGalaxyMaxPointSize();
+    }
 
     galaxyRenderer.toneMapping = THREE.ACESFilmicToneMapping;
     galaxyRenderer.toneMappingExposure = 1.15;
@@ -6960,7 +7046,12 @@ function tick() {
             // Shimmer rápido de baja amplitud encima del pulso
             const shimmer = Math.sin(time * shimmerSpeed + (aura.userData.shimmerPhase || 0)) * 0.06;
             const scale = aura.userData.baseScale + pulse + shimmer;
+            // aura.scale afecta al Sprite (desktop). aura.material.size afecta
+            // al Points (móvil, ver createGalaxyGlowPoints) — como el vértice
+            // vive en el origen local, tocar aura.scale ahí no hace nada, así
+            // que fijamos ambos y cada tipo de objeto usa el que le aplica.
             aura.scale.set(scale, scale, 1);
+            if (aura.material.size !== undefined) aura.material.size = scale;
             // Opacidad: varía en dos frecuencias para efecto "respiración mística"
             const opBase = 0.52 + Math.sin(time * speed * 0.7 + aura.userData.phase) * 0.15;
             const opShimmer = Math.sin(time * shimmerSpeed * 0.5 + index) * 0.075;
