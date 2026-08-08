@@ -6275,6 +6275,19 @@ const GALAXY_RADIUS = 7.0;
 // sin tener que encoger la geometría de la galaxia.
 const GALAXY_REFERENCE_DISTANCE = Math.sqrt(4 * 4 + 3 * 3 + 5 * 5);
 
+// Orienta manualmente un Mesh para que siempre mire de frente a la cámara,
+// igual que hace THREE.Sprite automáticamente — pero usando el camino de
+// render normal de una malla en vez del shader especial de Sprite (que es
+// justo lo que causaba el chorro/geíser en el S24 FE). extraZRotation
+// (opcional) rota la malla sobre su propio eje ya orientado a cámara, para
+// efectos tipo "destello girando".
+function billboardToCamera(mesh, extraZRotation = 0) {
+    if (!mesh || !galaxyCamera) return;
+    mesh.quaternion.copy(galaxyCamera.quaternion);
+    if (extraZRotation) mesh.rotateZ(extraZRotation);
+}
+
+
 // FIX GEÍSER/CHORRO DE LUZ EN LANDSCAPE MÓVIL (S24 FE, iPhone 14+, etc.):
 // GALAXY_BLOOM_MIN_HEIGHT antes se usaba en initGalaxy() pero NUNCA estaba
 // declarada en ningún archivo del proyecto → esa línea lanzaba
@@ -6419,7 +6432,7 @@ function initGalaxy() {
         starGlowIndexByStar.push(galaxyGlowPointDefs.length);
         galaxyGlowPointDefs.push({
             kind: 'star', position: galaxyGlowPointDefs[2 + i].position.clone(),
-            baseSize: 0.55, color: new THREE.Color('#ffffff'),
+            baseSize: 0.4, color: new THREE.Color('#ffffff'),
             baseOpacity: 1.0,
             phase: Math.random() * Math.PI * 2,
             starIndex: i
@@ -6544,16 +6557,26 @@ function initGalaxy() {
     }
 
     // --- ESTRELLA AZUL SECRETA ---
-    const blueAuraMaterial = new THREE.SpriteMaterial({
+    // FIX FINAL: esta era la única pieza que seguía siendo Sprite (se dejó
+    // para después porque no aparecía en las pruebas por estar oculta). Las
+    // capturas mostraron que también tenía el chorro/geíser. La convertimos
+    // a Mesh (PlaneGeometry) orientado manualmente hacia la cámara cada
+    // frame (billboardToCamera, definida más abajo) en vez de Sprite —
+    // conserva la textura de destello y la rotación, pero usa el camino de
+    // render normal de Three.js en vez del shader especial de Sprite.
+    const billboardPlaneGeo = new THREE.PlaneGeometry(1, 1);
+
+    const blueAuraMaterial = new THREE.MeshBasicMaterial({
         map: blueSecretAuraTexture,
         color: new THREE.Color('#7edcff'),
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: isHighEndMobile ? 0.48 : 0.40,
-        depthWrite: false
+        depthWrite: false,
+        depthTest: false
     });
 
-    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+    blueSecretAura = new THREE.Mesh(billboardPlaneGeo, blueAuraMaterial);
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
     blueSecretAura.scale.set(isHighEndMobile ? 1.95 : 1.68, isHighEndMobile ? 1.52 : 1.36, 1);
     blueSecretAura.userData = {
@@ -6563,16 +6586,17 @@ function initGalaxy() {
     };
     galaxyScene.add(blueSecretAura);
 
-    const blueStarMaterial = new THREE.SpriteMaterial({
+    const blueStarMaterial = new THREE.MeshBasicMaterial({
         map: asteroidFlareTexture, // Usamos el nuevo destello
         color: new THREE.Color('#99d6ff'), // Un azul un poco más vibrante
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 1,
-        depthWrite: false
+        depthWrite: false,
+        depthTest: false
     });
 
-    blueSecretStar = new THREE.Sprite(blueStarMaterial);
+    blueSecretStar = new THREE.Mesh(billboardPlaneGeo, blueStarMaterial);
     blueSecretStar.position.copy(blueSecretAura.position);
     blueSecretStar.scale.set(0.22, 0.22, 1);
     blueSecretStar.userData = {
@@ -6581,6 +6605,7 @@ function initGalaxy() {
     };
 
     galaxyScene.add(blueSecretStar);
+
 
     // Hitbox invisible del Agujero Negro
     const coreGeometry = new THREE.SphereGeometry(0.8, 16, 16);
@@ -7065,11 +7090,7 @@ function tick() {
             const scaleY = (blueSecretAura.userData.baseScaleY || 1.28) + pulse * 0.58;
             blueSecretAura.scale.set(scaleX, scaleY, 1);
             blueSecretAura.material.opacity = 0.26 + Math.sin(time * 1.35) * 0.055;
-        }
-        
-        if (blueSecretStar) {
-            const starPulse = 0.22 + Math.sin(time * 2.4) * 0.035;
-            blueSecretStar.scale.set(starPulse, starPulse, 1);
+            billboardToCamera(blueSecretAura);
         }
         
         // --- ANIMACIÓN DE LA BRISA DE NEUTRINOS (LUCIÉRNAGAS) ---
@@ -7161,7 +7182,7 @@ function tick() {
     // Le damos más tamaño y lo hacemos rotar lentamente
     const starPulse = 0.45 + Math.sin(time * 2.4) * 0.08;
     blueSecretStar.scale.set(starPulse, starPulse, 1);
-    blueSecretStar.material.rotation = time * 0.25; 
+    billboardToCamera(blueSecretStar, time * 0.25);
 
     const blueVector = new THREE.Vector3();
     blueSecretStar.getWorldPosition(blueVector); // Arregla el desfase de la estela
