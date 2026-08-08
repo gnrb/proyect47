@@ -5827,36 +5827,21 @@ function createNebulaTexture() {
 
 function createAuraTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
+    canvas.width = 512; 
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 256, 256);
+    const cx = 256, cy = 256;
 
-    // Halo volumétrico cálido base
-    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 110);
+    // Resplandor radial volumétrico súper suave (sin rayas ni "estrellas de cartón")
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
     gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
-    gradient.addColorStop(0.10, 'rgba(255, 240, 200, 0.85)');
-    gradient.addColorStop(0.25, 'rgba(255, 210, 120, 0.45)');
-    gradient.addColorStop(0.50, 'rgba(255, 140, 50, 0.15)');
-    gradient.addColorStop(1.00, 'rgba(0,0,0,0)');
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
-
-    // Destellos / Estela natural (Lens Flare)
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = 'rgba(255, 210, 120, 0.4)';
-    ctx.beginPath(); ctx.ellipse(128, 128, 120, 3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(128, 128, 3, 120, 0, 0, Math.PI * 2); ctx.fill();
-
-    // Destellos diagonales sutiles
-    ctx.fillStyle = 'rgba(255, 180, 80, 0.15)';
-    ctx.beginPath(); ctx.ellipse(128, 128, 80, 2, Math.PI/4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(128, 128, 80, 2, -Math.PI/4, 0, Math.PI * 2); ctx.fill();
-
-    // Anillo místico
-    const ringGrad = ctx.createRadialGradient(128, 128, 30, 128, 128, 100);
-    ringGrad.addColorStop(0.0,  'rgba(255, 255, 255, 0)');
-    ringGrad.addColorStop(0.5, 'rgba(255, 220, 150, 0.08)');
-    ringGrad.addColorStop(1.0,  'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = ringGrad; ctx.fillRect(0, 0, 256, 256);
+    gradient.addColorStop(0.08, 'rgba(255, 248, 220, 0.90)');
+    gradient.addColorStop(0.25, 'rgba(255, 220, 150, 0.40)');
+    gradient.addColorStop(0.60, 'rgba(255, 160, 80, 0.08)');
+    gradient.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 512, 512);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -5865,33 +5850,23 @@ function createAuraTexture() {
 }
 const auraTexture = createAuraTexture();
 
-// --- ESTA FUNCIÓN CREA EL AURA AZUL VIBRANTE CON DESTELLOS ---
 function createBlueSecretAuraTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    const cx = 128, cy = 128;
-    ctx.clearRect(0, 0, 256, 256);
-    ctx.globalCompositeOperation = 'lighter';
+    const cx = 256, cy = 256;
 
-    // 1. Núcleo resplandeciente Azul Profundo
-    const base = ctx.createRadialGradient(cx, cy, 0, cx, cy, 110);
-    base.addColorStop(0.00, 'rgba(255,255,255,1.0)');
-    base.addColorStop(0.08, 'rgba(150,220,255,0.9)');
-    base.addColorStop(0.25, 'rgba(0,100,255,0.6)');
-    base.addColorStop(0.55, 'rgba(0,30,255,0.15)');
-    base.addColorStop(1.00, 'rgba(0,0,0,0)');
-    ctx.fillStyle = base; ctx.fillRect(0, 0, 256, 256);
-
-    // 2. Estela Principal Azul (Lens Flare seguro para móvil)
-    ctx.fillStyle = 'rgba(60, 160, 255, 0.6)';
-    ctx.beginPath(); ctx.ellipse(cx, cy, 120, 3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx, cy, 3, 120, 0, 0, Math.PI * 2); ctx.fill();
-
-    // 3. Estela Diagonal
-    ctx.fillStyle = 'rgba(20, 100, 255, 0.25)';
-    ctx.beginPath(); ctx.ellipse(cx, cy, 70, 2, Math.PI/4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx, cy, 70, 2, -Math.PI/4, 0, Math.PI * 2); ctx.fill();
+    // Transición perfecta de Blanco -> Cyan -> Azul Rey profundo
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 240);
+    gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
+    gradient.addColorStop(0.10, 'rgba(160, 230, 255, 0.85)');
+    gradient.addColorStop(0.35, 'rgba(20, 100, 255, 0.35)');
+    gradient.addColorStop(0.70, 'rgba(0, 30, 180, 0.05)');
+    gradient.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 512, 512);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -5899,6 +5874,11 @@ function createBlueSecretAuraTexture() {
     return texture;
 }
 const blueSecretAuraTexture = createBlueSecretAuraTexture();
+
+function createAsteroidFlareTexture() {
+    return starTexture; // Usamos el círculo puro original para la estrella en sí
+}
+const asteroidFlareTexture = createAsteroidFlareTexture();
 
 function createGalaxyStreakTexture() {
     const canvas = document.createElement('canvas');
@@ -6456,27 +6436,20 @@ function initGalaxy() {
     // === DESTELLO DE LENTE EN EL NÚCLEO (EL CUÁSAR ESFÉRICO) ===
     galaxyCoreFlareGroup = new THREE.Group();
     const flareGhosts = [
-        { dist: 0,    scale: 3.5, opacity: 0.85, color: '#ffffff' }, // Unificado como en PC
-        { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' }  // Unificado como en PC
+        { dist: 0,    scale: 3.5, opacity: 0.85, color: '#ffffff' },
+        { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' } 
     ];
     flareGhosts.forEach((g, i) => {
-        let sprite;
-
-        if (isMobile) {
-            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
-            sprite = createGalaxyGlowPoints(auraTexture, g.color, g.opacity, g.scale);
-        } else {
-            const mat = new THREE.SpriteMaterial({
-                map: auraTexture,
-                color: new THREE.Color(g.color),
-                blending: THREE.AdditiveBlending,
-                transparent: true,
-                opacity: g.opacity,
-                depthWrite: false
-            });
-            sprite = new THREE.Sprite(mat);
-            sprite.scale.set(g.scale, g.scale, 1);
-        }
+        const mat = new THREE.SpriteMaterial({
+            map: auraTexture,
+            color: new THREE.Color(g.color),
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: g.opacity,
+            depthWrite: false
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(g.scale, g.scale, 1);
 
         sprite.userData = {
             dist: g.dist,
@@ -6544,23 +6517,18 @@ function initGalaxy() {
         const auraOpacity = isHighEndMobile ? 0.68 : 0.58;
         const auraSize = isHighEndMobile ? 1.72 : 1.45;
 
-        let aura;
-        if (isMobile) {
-            // Ver "RECONSTRUCCIÓN DEL AURA/NÚCLEO PARA MÓVIL" arriba de initGalaxy().
-            aura = createGalaxyGlowPoints(auraTexture, auraColor, auraOpacity, auraSize);
-        } else {
-            const auraMaterial = new THREE.SpriteMaterial({
-                map: auraTexture,
-                color: new THREE.Color(auraColor),
-                blending: THREE.AdditiveBlending,
-                transparent: true,
-                opacity: auraOpacity,
-                depthWrite: false,
-                depthTest: false
-            });
-            aura = new THREE.Sprite(auraMaterial);
-            aura.scale.set(auraSize, auraSize, 1);
-        }
+        // Ya no hay "if (isMobile)". Usamos Sprite para todos.
+        const auraMaterial = new THREE.SpriteMaterial({
+            map: auraTexture,
+            color: new THREE.Color(auraColor),
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: auraOpacity,
+            depthWrite: false,
+            depthTest: false
+        });
+        const aura = new THREE.Sprite(auraMaterial);
+        aura.scale.set(auraSize, auraSize, 1);
 
         aura.position.set(x, y, z);
         aura.userData = {
@@ -6605,15 +6573,15 @@ function initGalaxy() {
         );
     } else {
         const blueAuraMaterial = new THREE.SpriteMaterial({
-            map: blueSecretAuraTexture,
-            color: new THREE.Color('#0088ff'), // <-- Cambiado
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: blueAuraOpacity,
-            depthWrite: false
-        });
-        blueSecretAura = new THREE.Sprite(blueAuraMaterial);
-        blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
+        map: blueSecretAuraTexture,
+        color: new THREE.Color('#0066ff'),
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: blueAuraOpacity,
+        depthWrite: false
+    });
+    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+    blueSecretAura.scale.set(blueAuraSizeX, blueAuraSizeY, 1);
     }
 
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
@@ -6624,10 +6592,9 @@ function initGalaxy() {
     };
     galaxyScene.add(blueSecretAura);
 
-    // Mantenemos la lógica segura para el sprite
     const blueStarMaterial = new THREE.SpriteMaterial({
-        map: isMobile ? starTexture : asteroidFlareTexture,
-        color: new THREE.Color('#0088ff'), // <-- Cambiado de '#99d6ff'
+        map: starTexture,
+        color: new THREE.Color('#0088ff'),
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 1,
