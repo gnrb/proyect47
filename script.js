@@ -9257,9 +9257,43 @@ function getGalaxyRenderSize() {
 function initGalaxyDebugOverlay() {
     if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
 
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;display:flex;flex-direction:column;gap:6px;align-items:flex-start;';
+    document.body.appendChild(wrap);
+
     const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.75);color:#0f0;font:11px monospace;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre;';
-    document.body.appendChild(el);
+    el.style.cssText = 'background:rgba(0,0,0,0.75);color:#0f0;font:11px monospace;padding:6px 8px;border-radius:6px;white-space:pre;pointer-events:none;';
+    wrap.appendChild(el);
+
+    // Botones de prueba: aíslan si el chorro viene del bloom (post-proceso)
+    // o de los sprites en sí (núcleo/auras), incluso sin bloom encima.
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;pointer-events:auto;';
+    wrap.appendChild(btnRow);
+
+    function makeToggleBtn(label, getState, setState) {
+        const btn = document.createElement('button');
+        btn.style.cssText = 'font:11px monospace;padding:6px 8px;border-radius:6px;border:1px solid #0f0;background:#000;color:#0f0;';
+        const refresh = () => { btn.textContent = `${label}: ${getState() ? 'ON' : 'OFF'}`; };
+        btn.onclick = () => { setState(!getState()); refresh(); };
+        refresh();
+        btnRow.appendChild(btn);
+    }
+
+    makeToggleBtn(
+        'Bloom',
+        () => !!(galaxyBloomPass && galaxyBloomPass.enabled),
+        (v) => { if (galaxyBloomPass) galaxyBloomPass.enabled = v; }
+    );
+
+    makeToggleBtn(
+        'Núcleo+Auras',
+        () => !!(galaxyCoreFlareGroup && galaxyCoreFlareGroup.visible),
+        (v) => {
+            if (galaxyCoreFlareGroup) galaxyCoreFlareGroup.visible = v;
+            interactiveStarAuras.forEach(a => a.visible = v);
+        }
+    );
 
     setInterval(() => {
         if (currentWorld !== 1 || !galaxyCamera || !galaxyRenderer) {
