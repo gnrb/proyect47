@@ -6329,6 +6329,23 @@ function updateGalaxyCameraFraming() {
     }
 }
 
+// FIX EXYNOS 2400: Reemplazo seguro de THREE.Sprite
+function createSafeSprite(texture, colorVal, opacity, depthTest) {
+    const mat = new THREE.MeshBasicMaterial({
+        map: texture,
+        color: new THREE.Color(colorVal),
+        transparent: true,
+        opacity: opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: depthTest,
+        side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+    mesh.isSafeBillboard = true; // Etiqueta para que mire a la cámara en el tick()
+    return mesh;
+}
+
 function initGalaxy() {
     if (galaxyInitialized) return; 
     
@@ -6365,15 +6382,7 @@ function initGalaxy() {
         { dist: 0,    scale: 4.8, opacity: 0.35, color: '#ff9900' }  // Unificado como en PC
     ];
     flareGhosts.forEach((g, i) => {
-        const mat = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(g.color),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: g.opacity,
-            depthWrite: false
-        });
-        const sprite = new THREE.Sprite(mat);
+        const sprite = createSafeSprite(auraTexture, g.color, g.opacity, true);
         sprite.scale.set(g.scale, g.scale, 1);
         sprite.userData = {
             dist: g.dist,
@@ -6439,17 +6448,8 @@ function initGalaxy() {
 
         const auraColor = auraPalette[i % auraPalette.length];
 
-        const auraMaterial = new THREE.SpriteMaterial({
-            map: auraTexture,
-            color: new THREE.Color(auraColor),
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: isHighEndMobile ? 0.68 : 0.58,
-            depthWrite: false,
-            depthTest: false
-        });
-
-        const aura = new THREE.Sprite(auraMaterial);
+        // Reemplaza el aura
+        const aura = createSafeSprite(auraTexture, auraColor, isHighEndMobile ? 0.68 : 0.58, false);
         aura.position.set(x, y, z);
         aura.scale.set(isHighEndMobile ? 1.72 : 1.45, isHighEndMobile ? 1.72 : 1.45, 1);
         aura.userData = {
@@ -6458,9 +6458,17 @@ function initGalaxy() {
             shimmerPhase: Math.random() * Math.PI * 2,
             pulseSpeed: 1.2 + Math.random() * 0.8   
         };
-
         galaxyScene.add(aura);
         interactiveStarAuras.push(aura);
+
+        // Reemplaza la estrella
+        const star = createSafeSprite(starTexture, 0xffffff, 1, false);
+        star.scale.set(0.17, 0.17, 1);
+        star.position.set(x, y, z);
+        star.userData = { id: i, aura };
+        
+        galaxyScene.add(star);
+        interactiveStars.push(star);
 
         const star = new THREE.Sprite(starMat.clone());
         star.scale.set(0.17, 0.17, 1);
@@ -6484,7 +6492,8 @@ function initGalaxy() {
         depthWrite: false
     });
 
-    blueSecretAura = new THREE.Sprite(blueAuraMaterial);
+    // --- ESTRELLA AZUL SECRETA ---
+    blueSecretAura = createSafeSprite(blueSecretAuraTexture, '#7edcff', isHighEndMobile ? 0.48 : 0.40, true);
     blueSecretAura.position.set(-1.5, -5.5, -2.0);
     blueSecretAura.scale.set(isHighEndMobile ? 1.95 : 1.68, isHighEndMobile ? 1.52 : 1.36, 1);
     blueSecretAura.userData = {
@@ -6494,23 +6503,13 @@ function initGalaxy() {
     };
     galaxyScene.add(blueSecretAura);
 
-    const blueStarMaterial = new THREE.SpriteMaterial({
-        map: asteroidFlareTexture, // Usamos el nuevo destello
-        color: new THREE.Color('#99d6ff'), // Un azul un poco más vibrante
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 1,
-        depthWrite: false
-    });
-
-    blueSecretStar = new THREE.Sprite(blueStarMaterial);
+    blueSecretStar = createSafeSprite(asteroidFlareTexture, '#99d6ff', 1, true);
     blueSecretStar.position.copy(blueSecretAura.position);
     blueSecretStar.scale.set(0.22, 0.22, 1);
     blueSecretStar.userData = {
         id: 'blue-secret',
         aura: blueSecretAura
     };
-
     galaxyScene.add(blueSecretStar);
 
     // Hitbox invisible del Agujero Negro
@@ -6915,6 +6914,19 @@ const _tmpVecStar = new THREE.Vector3();
 
 function tick() {
     if (currentWorld === 1) {
+
+        if (galaxyScene && galaxyCamera) {
+            galaxyScene.traverse((child) => {
+                if (child.isSafeBillboard) {
+                    child.lookAt(galaxyCamera.position);
+                    // Aplica rotación en Z si el objeto lo necesita
+                    if (child.userData.zRotation) {
+                        child.rotateZ(child.userData.zRotation);
+                    }
+                }
+            });
+        }
+
         const time = clock.getElapsedTime();
         if (galaxyScene) {
             // Rotación base imponente
@@ -7068,7 +7080,7 @@ function tick() {
     // Le damos más tamaño y lo hacemos rotar lentamente
     const starPulse = 0.45 + Math.sin(time * 2.4) * 0.08;
     blueSecretStar.scale.set(starPulse, starPulse, 1);
-    blueSecretStar.material.rotation = time * 0.25; 
+    blueSecretStar.userData.zRotation = time * 0.25;
 
     const blueVector = new THREE.Vector3();
     blueSecretStar.getWorldPosition(blueVector); // Arregla el desfase de la estela
