@@ -5768,34 +5768,82 @@ let coreMesh;
 let blueSecretUnlocked = false; 
 let valeskaAsteroidRevealed = false; // guard: evita abrir la ficha si ya está abierta
 
-function createCircleTexture() {
+// ==========================================================================
+// GENERADOR DE TEXTURAS RADIALES SIN createRadialGradient
+// ==========================================================================
+// Por qué existe esto: en el S24 FE (GPU Xclipse/Exynos — arquitectura
+// bastante nueva e inmadura en el ecosistema Android, con antecedentes de
+// bugs de driver que no aparecen en Adreno/Mali) las texturas generadas con
+// context.createRadialGradient() se estaban subiendo a WebGL con una
+// silueta corrupta (una muesca cóncava consistente, no un artefacto de
+// bloom ni de compresión — se confirmó igual en capturas nativas sin
+// WhatsApp de por medio). No importa el mecanismo exacto del bug del
+// driver: la forma más robusta de evitarlo es no usar ese camino de código
+// en absoluto. Esta función calcula cada píxel a mano con matemática pura
+// en CPU (createImageData/putImageData) — un camino de renderizado
+// completamente distinto que no depende del rasterizador de gradientes
+// del navegador/GPU.
+//
+// `stops` es un array de paradas de color ordenadas por offset ascendente
+// (0..1), cada una {offset, r, g, b, a}, interpoladas linealmente — el
+// mismo concepto que los color stops de un CanvasGradient, pero calculados
+// a mano.
+function createRadialTextureFromStops(size, cx, cy, radius, stops) {
     const canvas = document.createElement('canvas');
-    canvas.width = 128; canvas.height = 128; 
-    const context = canvas.getContext('2d');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(size, size);
+    const data = imageData.data;
 
-    // FIX FORMA "RECTANGULAR" EN MÓVIL: antes esto era un círculo de borde
-    // totalmente duro (context.arc().fill() sin degradado). Un borde tan
-    // abrupto, al pasar por la cadena de mipmaps de UnrealBloomPass (que
-    // en móvil corre a una resolución mucho más baja que en desktop, ver
-    // GALAXY_BLOOM_MIN_HEIGHT), tiende a mostrar "esquinas"/bloques en vez
-    // de un halo redondo — el blur de cada mip es efectivamente una caja,
-    // y una caja sobre un borde duro deja ver su propia forma. Un
-    // pequeñísimo degradado en el 18% final del radio (el núcleo sigue
-    // siendo sólido, solo se suaviza el borde) le da a esa cadena de blur
-    // algo con qué trabajar sin dejar de verse como un punto nítido.
-    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 45);
-    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-    gradient.addColorStop(0.82, 'rgba(255,255,255,1)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const dx = x + 0.5 - cx;
+            const dy = y + 0.5 - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const t = Math.min(dist / radius, 1);
 
-    context.beginPath(); 
-    context.arc(64, 64, 45, 0, Math.PI * 2); // Margen gigante de seguridad
-    context.fillStyle = gradient; 
-    context.fill();
+            let s0 = stops[0];
+            let s1 = stops[stops.length - 1];
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (t >= stops[i].offset && t <= stops[i + 1].offset) {
+                    s0 = stops[i];
+                    s1 = stops[i + 1];
+                    break;
+                }
+            }
+            const span = (s1.offset - s0.offset) || 1;
+            const localT = Math.min(Math.max((t - s0.offset) / span, 0), 1);
+
+            const r = s0.r + (s1.r - s0.r) * localT;
+            const g = s0.g + (s1.g - s0.g) * localT;
+            const b = s0.b + (s1.b - s0.b) * localT;
+            const a = s0.a + (s1.a - s0.a) * localT;
+
+            const i4 = (y * size + x) * 4;
+            data[i4] = r;
+            data[i4 + 1] = g;
+            data[i4 + 2] = b;
+            data[i4 + 3] = Math.round(a * 255);
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
     texture.minFilter = THREE.LinearFilter;
     return texture;
+}
+
+function createCircleTexture() {
+    // Núcleo sólido hasta 82% del radio, últimos 18% se apagan a 0 — mismo
+    // perfil que antes, ahora sin createRadialGradient.
+    return createRadialTextureFromStops(128, 64, 64, 45, [
+        { offset: 0.00, r: 255, g: 255, b: 255, a: 1 },
+        { offset: 0.82, r: 255, g: 255, b: 255, a: 1 },
+        { offset: 1.00, r: 255, g: 255, b: 255, a: 0 }
+    ]);
 }
 const starTexture = createCircleTexture();
 
@@ -5840,65 +5888,39 @@ function createNebulaTexture() {
 }
 
 function createAuraTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 256, 256);
-
-    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 110);
-    gradient.addColorStop(0.00, 'rgba(255, 248, 220, 0.92)');
-    gradient.addColorStop(0.12, 'rgba(255, 235, 180, 0.60)');
-    gradient.addColorStop(0.30, 'rgba(255, 210, 130, 0.24)');
-    gradient.addColorStop(0.55, 'rgba(255, 180,  90, 0.09)');
-    gradient.addColorStop(1.00, 'rgba(0,0,0,0)'); 
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
-
-    ctx.globalCompositeOperation = 'screen';
-    const ringGrad = ctx.createRadialGradient(128, 128, 38, 128, 128, 96);
-    ringGrad.addColorStop(0.0,  'rgba(255, 255, 255, 0)');
-    ringGrad.addColorStop(0.45, 'rgba(255, 240, 200, 0.045)');
-    ringGrad.addColorStop(1.0,  'rgba(255,255,255,0)');
-    ctx.fillStyle = ringGrad; ctx.fillRect(0, 0, 256, 256);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    return texture;
+    // Réplica del degradado principal original (5 paradas). Se omite la
+    // segunda capa "anillo" con blend 'screen' que tenía el original — su
+    // alpha máximo era 0.045 (casi imperceptible) y también dependía de
+    // createRadialGradient; la diferencia visual de quitarla es mínima.
+    return createRadialTextureFromStops(256, 128, 128, 110, [
+        { offset: 0.00, r: 255, g: 248, b: 220, a: 0.92 },
+        { offset: 0.12, r: 255, g: 235, b: 180, a: 0.60 },
+        { offset: 0.30, r: 255, g: 210, b: 130, a: 0.24 },
+        { offset: 0.55, r: 255, g: 180, b:  90, a: 0.09 },
+        { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
+    ]);
 }
 const auraTexture = createAuraTexture();
 
 function createBlueSecretAuraTexture(saturated = false) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 192; canvas.height = 192;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 192, 192);
-    ctx.globalCompositeOperation = 'lighter';
-
-    const base = ctx.createRadialGradient(96, 96, 0, 96, 96, 80);
     if (saturated) {
         // MÓVIL: núcleo blanco más chico + azul más dominante/saturado
-        // desde antes en el degradado. En desktop el core.color de
-        // blueStarMaterial ya se lee azul sin ayuda; en móvil el bloom de
-        // menor resolución diluye más luz blanca/dorada del disco cercano
-        // sobre la estrella, así que le damos un punto de partida más
-        // azul para que sobreviva esa mezcla en vez de leerse blanquecina.
-        base.addColorStop(0.00, 'rgba(255,255,255,0.40)');
-        base.addColorStop(0.10, 'rgba(80,190,255,0.55)');
-        base.addColorStop(1.00, 'rgba(0,0,0,0)');
-    } else {
-        base.addColorStop(0.00, 'rgba(255,255,255,0.52)');
-        base.addColorStop(0.16, 'rgba(120,215,255,0.30)');
-        base.addColorStop(1.00, 'rgba(0,0,0,0)');
+        // desde antes en el degradado (ver nota en el uso más abajo).
+        return createRadialTextureFromStops(192, 96, 96, 80, [
+            { offset: 0.00, r: 255, g: 255, b: 255, a: 0.40 },
+            { offset: 0.10, r: 80,  g: 190, b: 255, a: 0.55 },
+            { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
+        ]);
     }
-    ctx.fillStyle = base; ctx.fillRect(0, 0, 192, 192);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    return texture;
+    return createRadialTextureFromStops(192, 96, 96, 80, [
+        { offset: 0.00, r: 255, g: 255, b: 255, a: 0.52 },
+        { offset: 0.16, r: 120, g: 215, b: 255, a: 0.30 },
+        { offset: 1.00, r: 0,   g: 0,   b: 0,   a: 0.00 }
+    ]);
 }
 const blueSecretAuraTexture = createBlueSecretAuraTexture(false);
 const blueSecretAuraTextureMobile = createBlueSecretAuraTexture(true);
+
 
 function createGalaxyStreakTexture() {
     const canvas = document.createElement('canvas');
