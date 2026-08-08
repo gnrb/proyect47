@@ -29,9 +29,11 @@ class ChemicalFluidSim {
             BASE_OPACITY: 0.96,
             MAX_PONDS: 4,
             POND_GRID_SIZE: 7,
-            CELL_CLEAR_THRESHOLD: this.isMobile ? 0.55 : 0.25, // <-- Más fricción en móvil
-            REVEAL_FRACTION: this.isMobile ? 0.85 : 0.65,      // <-- Exige descubrir más área en móvil
-            POND_DECAY_PER_SEC: 0.15,   
+            
+            // --- AJUSTES DE DIFICULTAD EQUILIBRADOS ---
+            CELL_CLEAR_THRESHOLD: this.isMobile ? 0.50 : 0.45, // PC bajó a 0.45 (antes estaba muy duro en 0.65)
+            REVEAL_FRACTION: this.isMobile ? 0.78 : 0.75,      // PC bajó a 0.75 (ya no pide el 85%)
+            POND_DECAY_PER_SEC: 0.25,                          // El líquido da un pequeño respiro antes de tapar de nuevo
             REVEAL_SHRINK_SECONDS: 1.1
         };
 
@@ -552,8 +554,9 @@ class ChemicalFluidSim {
                     if (cd > brush) continue;
                     
                     const falloff = 1 - (cd / brush);
-                    // Restamos peso al toque si es un celular para compensar la alta frecuencia de toques
-                    const splatWeight = this.isMobile ? 0.12 : 0.55; 
+                    
+                    // FIX: Un punto medio para el mouse en PC (0.35)
+                    const splatWeight = this.isMobile ? 0.12 : 0.35; 
                     pond.cells[idx] = Math.min(1, pond.cells[idx] + intensity * falloff * splatWeight);
                 }
             }
