@@ -8581,12 +8581,34 @@ function resizeGalaxyToApp() {
 
     // El canvas DOM mantiene su resolución perfecta y nítida
     galaxyRenderer.setSize(width, height);
-    
-    // Obligamos al procesador de efectos a usar una resolución múltiplo de 32
-    // (evita pixeles con decimales al dividir la pantalla para el desenfoque).
-    const safeWidth = Math.max(32, Math.floor(width / 32) * 32);
-    const safeHeight = Math.max(32, Math.floor(height / 32) * 32);
-    galaxyComposer.setSize(safeWidth, safeHeight);
+
+    // FIX GEÍSERES EN LANDSCAPE MÓVIL (causa raíz real):
+    // Antes el composer se redondeaba a un múltiplo de 32 POR EJE por
+    // separado (Math.floor(width/32)*32 y Math.floor(height/32)*32). En
+    // pantallas anchas y cortas eso rompe el aspect ratio real: p.ej. un
+    // canvas de 799.3x384.0 (aspect 2.0815) se redondeaba a 768x384
+    // (aspect 2.0000). El composer quedaba renderizando con un aspect
+    // distinto al que usa galaxyCamera.aspect para construir su
+    // projectionMatrix.
+    //
+    // Para los Points del disco (gl_PointSize, en píxeles absolutos ya
+    // post-proyección) ese desfase no importa — por eso el disco siempre
+    // se vio bien. Pero un THREE.Sprite con escala UNIFORME (x=y, como el
+    // núcleo/auras) deja de proyectarse como círculo si la projectionMatrix
+    // (calculada con un aspect) no coincide con el aspect real del render
+    // target donde se rasteriza (calculado con otro). Con sprites grandes
+    // y colas de degradado aditivo muy largas (núcleo, auras), ese ~4-8%
+    // de desfase estira la cola tenue lo suficiente para verse como un
+    // chorro/geíser vertical sobre el fondo negro — con o sin Bloom.
+    //
+    // Ahora el composer usa el mismo tamaño exacto que la cámara y el
+    // renderer (ya perfectamente sincronizados entre sí), sin redondeo
+    // independiente por eje. Three.js internamente ya maneja bien
+    // dimensiones no-enteras al crear los render targets, así que no
+    // hace falta forzar múltiplos de 32 aquí — eso solo le sirve (y ya
+    // se le da, de forma aspect-safe) a la cadena de mips interna del
+    // propio bloomPass vía applyGalaxyBloomResolution() de abajo.
+    galaxyComposer.setSize(width, height);
 
     // EL FIX DEFINITIVO PARA LOS CHORROS DE LUZ EN LANDSCAPE MÓVIL:
     // galaxyComposer.setSize() de arriba acaba de reencoger TODO, incluido
