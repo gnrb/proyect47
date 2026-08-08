@@ -5790,16 +5790,18 @@ function createAsteroidFlareTexture() {
     const ctx = canvas.getContext('2d');
     const cx = 128, cy = 128;
 
-    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 80);
     core.addColorStop(0, 'rgba(255,255,255,1)');
-    core.addColorStop(0.3, 'rgba(160,220,255,0.9)');
+    core.addColorStop(0.2, 'rgba(180,230,255,0.9)');
+    core.addColorStop(0.5, 'rgba(40,150,255,0.4)');
     core.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = core;
     ctx.fillRect(0,0,256,256);
 
-    ctx.fillStyle = 'rgba(140, 210, 255, 0.8)';
-    ctx.beginPath(); ctx.ellipse(cx, cy, 100, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx, cy, 5, 100, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = 'rgba(80, 180, 255, 0.6)';
+    ctx.beginPath(); ctx.ellipse(cx, cy, 110, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 4, 110, 0, 0, Math.PI * 2); ctx.fill();
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -5829,19 +5831,31 @@ function createAuraTexture() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, 256, 256);
 
+    // Halo volumétrico cálido base
     const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 110);
-    gradient.addColorStop(0.00, 'rgba(255, 248, 220, 0.92)');
-    gradient.addColorStop(0.12, 'rgba(255, 235, 180, 0.60)');
-    gradient.addColorStop(0.30, 'rgba(255, 210, 130, 0.24)');
-    gradient.addColorStop(0.55, 'rgba(255, 180,  90, 0.09)');
-    gradient.addColorStop(1.00, 'rgba(0,0,0,0)'); 
+    gradient.addColorStop(0.00, 'rgba(255, 255, 255, 1.0)');
+    gradient.addColorStop(0.10, 'rgba(255, 240, 200, 0.85)');
+    gradient.addColorStop(0.25, 'rgba(255, 210, 120, 0.45)');
+    gradient.addColorStop(0.50, 'rgba(255, 140, 50, 0.15)');
+    gradient.addColorStop(1.00, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
 
+    // Destellos / Estela natural (Lens Flare)
     ctx.globalCompositeOperation = 'screen';
-    const ringGrad = ctx.createRadialGradient(128, 128, 38, 128, 128, 96);
+    ctx.fillStyle = 'rgba(255, 210, 120, 0.4)';
+    ctx.beginPath(); ctx.ellipse(128, 128, 120, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(128, 128, 3, 120, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Destellos diagonales sutiles
+    ctx.fillStyle = 'rgba(255, 180, 80, 0.15)';
+    ctx.beginPath(); ctx.ellipse(128, 128, 80, 2, Math.PI/4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(128, 128, 80, 2, -Math.PI/4, 0, Math.PI * 2); ctx.fill();
+
+    // Anillo místico
+    const ringGrad = ctx.createRadialGradient(128, 128, 30, 128, 128, 100);
     ringGrad.addColorStop(0.0,  'rgba(255, 255, 255, 0)');
-    ringGrad.addColorStop(0.45, 'rgba(255, 240, 200, 0.045)');
-    ringGrad.addColorStop(1.0,  'rgba(255,255,255,0)');
+    ringGrad.addColorStop(0.5, 'rgba(255, 220, 150, 0.08)');
+    ringGrad.addColorStop(1.0,  'rgba(255, 255, 255, 0)');
     ctx.fillStyle = ringGrad; ctx.fillRect(0, 0, 256, 256);
 
     const texture = new THREE.CanvasTexture(canvas);
@@ -5851,18 +5865,33 @@ function createAuraTexture() {
 }
 const auraTexture = createAuraTexture();
 
+// --- ESTA FUNCIÓN CREA EL AURA AZUL VIBRANTE CON DESTELLOS ---
 function createBlueSecretAuraTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 192; canvas.height = 192;
+    canvas.width = 256; canvas.height = 256;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 192, 192);
+    const cx = 128, cy = 128;
+    ctx.clearRect(0, 0, 256, 256);
     ctx.globalCompositeOperation = 'lighter';
 
-    const base = ctx.createRadialGradient(96, 96, 0, 96, 96, 80);
-    base.addColorStop(0.00, 'rgba(255,255,255,0.52)');
-    base.addColorStop(0.16, 'rgba(120,215,255,0.30)');
+    // 1. Núcleo resplandeciente Azul Profundo
+    const base = ctx.createRadialGradient(cx, cy, 0, cx, cy, 110);
+    base.addColorStop(0.00, 'rgba(255,255,255,1.0)');
+    base.addColorStop(0.08, 'rgba(150,220,255,0.9)');
+    base.addColorStop(0.25, 'rgba(0,100,255,0.6)');
+    base.addColorStop(0.55, 'rgba(0,30,255,0.15)');
     base.addColorStop(1.00, 'rgba(0,0,0,0)');
-    ctx.fillStyle = base; ctx.fillRect(0, 0, 192, 192);
+    ctx.fillStyle = base; ctx.fillRect(0, 0, 256, 256);
+
+    // 2. Estela Principal Azul (Lens Flare seguro para móvil)
+    ctx.fillStyle = 'rgba(60, 160, 255, 0.6)';
+    ctx.beginPath(); ctx.ellipse(cx, cy, 120, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 3, 120, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 3. Estela Diagonal
+    ctx.fillStyle = 'rgba(20, 100, 255, 0.25)';
+    ctx.beginPath(); ctx.ellipse(cx, cy, 70, 2, Math.PI/4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 70, 2, -Math.PI/4, 0, Math.PI * 2); ctx.fill();
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.generateMipmaps = false;
@@ -6562,6 +6591,7 @@ function initGalaxy() {
     // detalle elíptico (Points solo admite un tamaño escalar), pero a cambio
     // deja de "desaparecer"/aplastarse por la misma distorsión de aspect que
     // afectaba a los Sprites grandes.
+    // --- ESTRELLA AZUL SECRETA ---
     const blueAuraOpacity = isHighEndMobile ? 0.48 : 0.40;
     const blueAuraSizeX = isHighEndMobile ? 1.95 : 1.68;
     const blueAuraSizeY = isHighEndMobile ? 1.52 : 1.36;
@@ -6569,14 +6599,14 @@ function initGalaxy() {
     if (isMobile) {
         blueSecretAura = createGalaxyGlowPoints(
             blueSecretAuraTexture,
-            '#7edcff',
+            '#0088ff', // <-- Cambiado de '#7edcff' a un azul rey profundo
             blueAuraOpacity,
-            (blueAuraSizeX + blueAuraSizeY) / 2 // se pierde la elipse, promedio razonable
+            (blueAuraSizeX + blueAuraSizeY) / 2
         );
     } else {
         const blueAuraMaterial = new THREE.SpriteMaterial({
             map: blueSecretAuraTexture,
-            color: new THREE.Color('#7edcff'),
+            color: new THREE.Color('#0088ff'), // <-- Cambiado
             blending: THREE.AdditiveBlending,
             transparent: true,
             opacity: blueAuraOpacity,
@@ -6594,19 +6624,10 @@ function initGalaxy() {
     };
     galaxyScene.add(blueSecretAura);
 
-    // blueSecretStar SÍ es clicable (raycaster más abajo) — se queda como
-    // Sprite siempre, para no tocar esa lógica. Lo que cambia es la textura:
-    // asteroidFlareTexture tiene una cruz de destello dibujada a mano (dos
-    // elipses, una horizontal y una vertical) directamente en el PNG. En
-    // desktop esa cruz siempre se vio bien, pero en el aspect extremo de
-    // celular landscape es justo lo que se estira en un "geíser" vertical.
-    // En móvil usamos starTexture (el mismo círculo suave de las estrellas
-    // normales, ya confirmado sin artefactos) — el color celeste sigue
-    // distinguiéndola, y la rotación de abajo (material.rotation) queda
-    // como no-op inofensivo sobre un círculo.
+    // Mantenemos la lógica segura para el sprite
     const blueStarMaterial = new THREE.SpriteMaterial({
         map: isMobile ? starTexture : asteroidFlareTexture,
-        color: new THREE.Color('#99d6ff'), // Un azul un poco más vibrante
+        color: new THREE.Color('#0088ff'), // <-- Cambiado de '#99d6ff'
         blending: THREE.AdditiveBlending,
         transparent: true,
         opacity: 1,
