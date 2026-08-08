@@ -5854,7 +5854,7 @@ const blueSecretAuraTexture = createBlueSecretAuraTexture();
 function createAsteroidFlareTexture() {
     return starTexture; // Reutilizamos el círculo perfecto
 }
-const asteroidFlareTexture = createAsteroidFlareTexture();
+
 const asteroidFlareTexture = createAsteroidFlareTexture();
 
 function createGalaxyStreakTexture() {
