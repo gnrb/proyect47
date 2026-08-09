@@ -1154,6 +1154,8 @@ let yellowPointerActive = false;
 let yellowLastX = null;
 let yellowLastY = null;
 let yellowFireflies = [];
+let yellowHillMotes = [];
+let yellowBlueCrackleShards = [];
 const yellowLyricMain = document.getElementById('yellow-lyric-main');
 const yellowLyricNext = document.getElementById('yellow-lyric-next');
 const yellowLyricsBox = document.querySelector('.yellow-lyrics-box');
@@ -1303,6 +1305,27 @@ function spawnBlueSpark() {
         isSecretBlue: true,
         caught: false
     });
+
+    // "Crepitar" del carbón: un puñado de fragmentos diminutos que se
+    // desprenden justo cuando aparece, como cuando la leña truena por el
+    // calor. Es la única pista de que ESTA chispa es distinta — nada de
+    // color llamativo ni de tamaño, solo un estallido breve que dura menos
+    // de medio segundo. Nada de gradientes ni shadowBlur acá: son puntos
+    // simples, muy baratos, para no sumarle peso al canvas.
+    const crackleCount = 4 + Math.floor(Math.random() * 3); // 4-6 fragmentos
+    for (let i = 0; i < crackleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.6 + Math.random() * 1.1;
+        yellowBlueCrackleShards.push({
+            x: baseX + (Math.random() - 0.5) * 14,
+            y: baseY - (15 + Math.random() * 15),
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.4,
+            life: 0,
+            maxLife: 10 + Math.random() * 10,
+            size: 0.7 + Math.random() * 0.9
+        });
+    }
 }
 
 function initYellowWorld() {
@@ -1521,6 +1544,7 @@ function startYellowFire() {
 
     yellowFireParticles = [];
     yellowFireSparks = [];
+    yellowBlueCrackleShards = [];
 
     yellowFireflies = [];
     for(let i = 0; i < 65; i++) {
@@ -1531,6 +1555,22 @@ function startYellowFire() {
             vy: (Math.random() - 0.5) * 1.5,
             size: 1.2 + Math.random() * 2.5,
             phase: Math.random() * Math.PI * 2
+        });
+    }
+
+    // Motas ambientales pegadas a la cresta de la colina (paisaje). A
+    // propósito son mucho más simples que las luciérnagas: sin reacción a
+    // viento/puntero y un solo gradiente por mota, para sumar vida al
+    // paisaje sin repetir el costo de las luciérnagas completas.
+    yellowHillMotes = [];
+    for (let i = 0; i < 16; i++) {
+        yellowHillMotes.push({
+            x: Math.random() * window.innerWidth,
+            y: window.innerHeight * (0.78 + Math.random() * 0.14),
+            phase: Math.random() * Math.PI * 2,
+            bob: 3 + Math.random() * 4,
+            speed: 0.15 + Math.random() * 0.25,
+            size: 0.8 + Math.random() * 1.2
         });
     }
 
@@ -1550,6 +1590,8 @@ function stopYellowFire() {
 
     yellowFireParticles = [];
     yellowFireSparks = [];
+    yellowBlueCrackleShards = [];
+    yellowHillMotes = [];
 }
 
 function emitYellowFireParticle(width, height, progress) {
@@ -1844,6 +1886,29 @@ function animateYellowFire() {
             return s.life < s.maxLife;
         });
 
+        // --- CREPITAR DE LA CHISPA AZUL (fragmentos que se desprenden al aparecer) ---
+        // Sin gradientes ni shadowBlur a propósito: son puntitos simples que
+        // viven menos de medio segundo, muy baratos de dibujar.
+        yellowBlueCrackleShards = yellowBlueCrackleShards.filter(c => {
+            c.life++;
+            const ct = c.life / c.maxLife;
+            const calpha = Math.max(0, 1 - ct);
+
+            c.x += c.vx;
+            c.y += c.vy;
+            c.vx *= 0.90;
+            c.vy *= 0.90;
+
+            if (calpha > 0.03) {
+                ctx.fillStyle = `rgba(190, 225, 255, ${calpha * 0.9})`;
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            return c.life < c.maxLife;
+        });
+
         ctx.globalCompositeOperation = 'source-over';
 
         // --- RENDER LUCIÉRNAGAS (Boids-lite) ---
@@ -1923,6 +1988,27 @@ function animateYellowFire() {
 
                     fCtx.restore();
                 }
+            });
+
+            // --- MOTAS AMBIENTALES DE LA CRESTA (paisaje) ---
+            // A diferencia de las luciérnagas: sin reacción a viento/puntero,
+            // un solo gradiente chico por mota, sin save/rotate/restore ni
+            // shadowBlur. Pensadas para dar vida al horizonte sin repetir el
+            // costo de las luciérnagas completas.
+            yellowHillMotes.forEach(m => {
+                m.phase += m.speed * 0.02;
+                const my = m.y + Math.sin(m.phase) * m.bob;
+                const mAlpha = 0.16 + Math.sin(m.phase * 1.3) * 0.11;
+                if (mAlpha <= 0) return;
+
+                const moteRadius = m.size * 4;
+                const moteGrad = fCtx.createRadialGradient(m.x, my, 0, m.x, my, moteRadius);
+                moteGrad.addColorStop(0, `rgba(255, 225, 150, ${mAlpha})`);
+                moteGrad.addColorStop(1, 'rgba(255, 200, 100, 0)');
+                fCtx.fillStyle = moteGrad;
+                fCtx.beginPath();
+                fCtx.arc(m.x, my, moteRadius, 0, Math.PI * 2);
+                fCtx.fill();
             });
         }
     } catch (error) {
