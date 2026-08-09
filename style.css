@@ -2416,6 +2416,43 @@ body {
     mix-blend-mode: screen;
 }
 
+/* --- BRILLO CÁLIDO DE LA COLINA (respira con el fuego) --- */
+.yellow-hill-glow {
+    position: absolute;
+    bottom: -2vh;
+    left: 0;
+    width: 100vw;
+    height: clamp(120px, 20vh, 250px);
+    z-index: 8 !important; /* Junto al fuego, por delante de la topografía */
+    pointer-events: none;
+    background: linear-gradient(
+        to top,
+        rgba(255, 150, 40, 0.22) 0%,
+        rgba(255, 120, 20, 0.10) 35%,
+        transparent 75%
+    );
+    mix-blend-mode: screen;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+}
+
+/* Solo respira cuando el fuego ya está "encendido" (misma clase que ya
+   controla otros elementos según flameProgress > 0.22) */
+.world-yellow.lit .yellow-hill-glow {
+    opacity: 1;
+    animation: yellowHillGlowFlicker 3.4s ease-in-out infinite;
+}
+
+@keyframes yellowHillGlowFlicker {
+    0%   { opacity: 0.55; }
+    18%  { opacity: 0.85; }
+    32%  { opacity: 0.6; }
+    50%  { opacity: 0.95; }
+    68%  { opacity: 0.65; }
+    83%  { opacity: 0.8; }
+    100% { opacity: 0.55; }
+}
+
 /* --- TEXTOS Y LETRAS --- */
 .yellow-lyrics-box {
     position: absolute;
