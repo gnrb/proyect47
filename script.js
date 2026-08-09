@@ -6090,10 +6090,20 @@ function isHighEndMobileGalaxyDevice() {
 function createUnifiedGalaxy(parameters, isMobile, isHighEndMobile) {
     const group = new THREE.Group();
 
-    // 🌟 Cantidad MASIVA unificada: sin reducción por dispositivo.
-    // PC y móvil (gama alta o baja) usan siempre la calidad máxima.
-    const starCount = 250000;
-    const dustCount = 55000;
+    // MEJORA #3 — MÁS PARTÍCULAS: sistema estático (posiciones calculadas
+    // una sola vez acá, la rotación es barata vía shader con uTime), no el
+    // motor GPGPU de galaxy-physics-webgl.js — ese archivo se carga pero
+    // nunca se instancia, no es lo que corre en pantalla. Así que subir
+    // esto es lineal (~1.5x costo real), no ~4x como sería con una textura
+    // cuadrada GPGPU. Ya corría 250K+55K=305K sin reducción para móvil y
+    // sin quejas de rendimiento, así que 1.5x (375K+82.5K≈457.5K) debería
+    // entrar cómodo tanto en el Xclipse 940 (S24 FE) como en el A16
+    // (iPhone 15). Único costo real del cambio: el loop de generación de
+    // posiciones (buildLayer) corre una sola vez al entrar a World 1, así
+    // que el único efecto notable sería un pelín más de espera en esa
+    // carga inicial — nada por frame.
+    const starCount = 375000;
+    const dustCount = 82500;
 
     // Colores del Cuásar: Centro puro, halo cálido, bordes espaciales
     const colorCore  = new THREE.Color('#ffffff'); // Blanco puro
@@ -6750,11 +6760,23 @@ function initGalaxy() {
     // primer frame en vez de solo hasta el próximo resize.
     const safeW = Math.max(32, Math.floor(sizes.width / 32) * 32);
     const safeH = Math.max(32, Math.floor(Math.max(sizes.height, GALAXY_BLOOM_MIN_HEIGHT) / 32) * 32);
+    // MEJORA #2 — MÁS LUMINOSIDAD: ahora que confirmamos que el bloom en sí
+    // nunca fue la causa del geíser (era la proyección de los Sprites, ya
+    // migrados a Points), se puede subir sin el mismo riesgo de antes.
+    //   - strength 0.58 → 0.80: glow general más intenso.
+    //   - radius   0.62 → 0.74: el halo se esparce un poco más suave/ancho.
+    //   - threshold 0.42 → 0.33: antes solo el núcleo casi-blanco puro
+    //     disparaba bloom; bajar el umbral deja que los brazos espirales
+    //     dorados/rosados (que ya son bastante brillantes pero no llegaban
+    //     al corte) también empiecen a brillar un poco, así la galaxia se
+    //     siente luminosa en conjunto y no solo el centro.
+    // Son solo números — si al verlo se siente muy fuerte o muy tenue, se
+    // puede afinar sin tocar nada más.
     const bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(safeW, safeH),
-        0.58, // Strength
-        0.62, // Radius
-        0.42  // Threshold
+        0.80, // Strength
+        0.74, // Radius
+        0.33  // Threshold
     );
     galaxyComposer = new THREE.EffectComposer(galaxyRenderer);
     galaxyComposer.addPass(renderScene);
