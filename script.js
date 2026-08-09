@@ -4669,9 +4669,13 @@ function buildLyricConstellation(lyric, index, isMobile = false) {
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-        // 2. Variables de tamaño de letra que faltaban
+        // AJUSTE: con el disco más luminoso (mejora de bloom), 0.6/0.014-16
+        // se perdían contra el dorado de los brazos — mismo tono de color,
+        // no solo brillo. Subimos opacidad y tamaño formados; el color se
+        // resuelve aparte en updateGalaxyLyricConstellations (ahora sí usa
+        // "presence" para virar a un dorado más blanco/caliente al formar).
         const freeSize = isMobile ? 0.025 : 0.022;
-        const formedSize = isMobile ? 0.016 : 0.014;
+        const formedSize = isMobile ? 0.024 : 0.021;
 
         const material = new THREE.PointsMaterial({
             size: freeSize, 
@@ -4708,7 +4712,7 @@ function buildLyricConstellation(lyric, index, isMobile = false) {
             formedSize: formedSize,
 
             freeOpacity: 0.04,
-            formedOpacity: 0.6,
+            formedOpacity: 0.92,
 
             dispersedColor: new THREE.Color('#fff4ba'),
             formedColor: new THREE.Color('#ffd700')
@@ -4799,10 +4803,14 @@ function updateGalaxyLyricConstellations(current, elapsedTime) {
                     positions[j + 2] = hz + (tz - hz) * presence + freeDriftZ;
                 }
 
-                // Colores tranquilos (dorado pálido)
+                // Color: dorado pálido disperso → dorado más blanco/caliente
+                // al formarse (interpola con "presence"). Antes era un color
+                // fijo sin importar el estado — ahora la palabra formada
+                // tiene un extra de contraste (más blanco = más brillante
+                // percibido) además del boost de opacidad/tamaño.
                 colors[j]     = 1.0;
-                colors[j + 1] = 0.9569;
-                colors[j + 2] = 0.7294;
+                colors[j + 1] = 0.9569 + (0.98 - 0.9569) * presence;
+                colors[j + 2] = 0.7294 + (0.85 - 0.7294) * presence;
             }
 
             constellation.geometry.attributes.position.needsUpdate = true;
@@ -6087,131 +6095,13 @@ function isHighEndMobileGalaxyDevice() {
     return screenOk && dprOk && cpuOk && memOk;
 }
 
-// ==========================================================================
-// MEJORA #4 — NIEBLA/VOLUMEN
-// ==========================================================================
-// Mismo patrón ya probado sin problemas en el S24 FE: Points + shader
-// propio (gl_PointSize, nada de Sprite, nada de createRadialGradient). La
-// técnica es la clásica "volumen vía muchos sprites suaves acumulados":
-// puntos grandes con opacidad MUY baja cada uno, que al superponerse leen
-// como una niebla continua en vez de puntos individuales — sin necesitar
-// raymarching ni ninguna textura nueva (cero superficie nueva para otro
-// bug raro).
-function createGalaxyNebula(isMobile, isHighEndMobile) {
-    const nebulaCount = isHighEndMobile ? 700 : (isMobile ? 480 : 900);
-    const nebulaGeo = new THREE.BufferGeometry();
-    const nebulaPos = new Float32Array(nebulaCount * 3);
-    const nebulaColor = new Float32Array(nebulaCount * 3);
-    const nebulaSize = new Float32Array(nebulaCount);
-    const nebulaOpacity = new Float32Array(nebulaCount);
-    const nebulaPhase = new Float32Array(nebulaCount);
-
-    // Paleta fría/romántica que complementa el dorado del disco sin
-    // competir con él — violetas, magentas y celestes suaves.
-    const nebulaPalette = [
-        new THREE.Color('#6a4dff'),
-        new THREE.Color('#ff6ec7'),
-        new THREE.Color('#4da6ff'),
-        new THREE.Color('#b06aff'),
-        new THREE.Color('#ff9ecb')
-    ];
-
-    for (let i = 0; i < nebulaCount; i++) {
-        // Distribución aplanada alrededor del disco (más ancha que alta,
-        // como el halo difuso real de una galaxia espiral), empezando un
-        // poco después del núcleo y extendiéndose más allá del borde del
-        // disco (radio ~7) sin llegar al cascarón de estrellas de fondo
-        // (radio 25-55) — ocupa el espacio "vacío" intermedio.
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 3 + Math.pow(Math.random(), 0.6) * 14; // 3 a 17
-        const heightSpread = 1.2 + radius * 0.15;
-        nebulaPos[i * 3 + 0] = Math.cos(angle) * radius;
-        nebulaPos[i * 3 + 1] = (Math.random() - 0.5) * heightSpread;
-        nebulaPos[i * 3 + 2] = Math.sin(angle) * radius;
-
-        const tint = nebulaPalette[Math.floor(Math.random() * nebulaPalette.length)];
-        nebulaColor[i * 3 + 0] = tint.r;
-        nebulaColor[i * 3 + 1] = tint.g;
-        nebulaColor[i * 3 + 2] = tint.b;
-
-        // Grandes para que se solapen bastante (eso es lo que da la
-        // sensación de "volumen" en vez de puntos sueltos) pero cada uno
-        // MUY tenue individualmente.
-        nebulaSize[i] = 4 + Math.random() * 7;
-        nebulaOpacity[i] = 0.02 + Math.random() * 0.035;
-        nebulaPhase[i] = Math.random() * Math.PI * 2;
-    }
-
-    nebulaGeo.setAttribute('position', new THREE.BufferAttribute(nebulaPos, 3));
-    nebulaGeo.setAttribute('aColor', new THREE.BufferAttribute(nebulaColor, 3));
-    nebulaGeo.setAttribute('aSize', new THREE.BufferAttribute(nebulaSize, 1));
-    nebulaGeo.setAttribute('aOpacity', new THREE.BufferAttribute(nebulaOpacity, 1));
-    nebulaGeo.setAttribute('aPhase', new THREE.BufferAttribute(nebulaPhase, 1));
-
-    const nebulaMat = new THREE.ShaderMaterial({
-        uniforms: {
-            uScaleFactor: { value: 600 },
-            uTime: { value: 0 }
-        },
-        vertexShader: `
-            attribute float aSize;
-            attribute float aOpacity;
-            attribute vec3 aColor;
-            attribute float aPhase;
-            uniform float uScaleFactor;
-            uniform float uTime;
-            varying vec3 vColor;
-            varying float vOpacity;
-            void main() {
-                vColor = aColor;
-                // Respiración muy lenta y sutil — evita que la niebla se
-                // sienta "plana"/estática sin llegar a distraer.
-                vOpacity = aOpacity * (0.75 + 0.25 * sin(uTime * 0.12 + aPhase));
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                gl_PointSize = aSize * (uScaleFactor / -mvPosition.z);
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `,
-        fragmentShader: `
-            varying vec3 vColor;
-            varying float vOpacity;
-            void main() {
-                vec2 uv = gl_PointCoord - 0.5;
-                float d = length(uv) * 2.0;
-                // Caída bien suave y ancha, sin borde definido — es niebla,
-                // no una estrella puntual.
-                float glow = pow(clamp(1.0 - d, 0.0, 1.0), 2.4);
-                gl_FragColor = vec4(vColor, glow * vOpacity);
-            }
-        `,
-        transparent: true,
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending
-    });
-
-    const nebula = new THREE.Points(nebulaGeo, nebulaMat);
-    nebula.frustumCulled = false;
-    return nebula;
-}
-
 function createUnifiedGalaxy(parameters, isMobile, isHighEndMobile) {
     const group = new THREE.Group();
 
-    // MEJORA #3 — MÁS PARTÍCULAS: sistema estático (posiciones calculadas
-    // una sola vez acá, la rotación es barata vía shader con uTime), no el
-    // motor GPGPU de galaxy-physics-webgl.js — ese archivo se carga pero
-    // nunca se instancia, no es lo que corre en pantalla. Así que subir
-    // esto es lineal (~1.5x costo real), no ~4x como sería con una textura
-    // cuadrada GPGPU. Ya corría 250K+55K=305K sin reducción para móvil y
-    // sin quejas de rendimiento, así que 1.5x (375K+82.5K≈457.5K) debería
-    // entrar cómodo tanto en el Xclipse 940 (S24 FE) como en el A16
-    // (iPhone 15). Único costo real del cambio: el loop de generación de
-    // posiciones (buildLayer) corre una sola vez al entrar a World 1, así
-    // que el único efecto notable sería un pelín más de espera en esa
-    // carga inicial — nada por frame.
-    const starCount = 375000;
-    const dustCount = 82500;
+    // 🌟 Cantidad MASIVA unificada: sin reducción por dispositivo.
+    // PC y móvil (gama alta o baja) usan siempre la calidad máxima.
+    const starCount = 250000;
+    const dustCount = 55000;
 
     // Colores del Cuásar: Centro puro, halo cálido, bordes espaciales
     const colorCore  = new THREE.Color('#ffffff'); // Blanco puro
@@ -6551,7 +6441,7 @@ function initGalaxy() {
         starGlowIndexByStar.push(galaxyGlowPointDefs.length);
         galaxyGlowPointDefs.push({
             kind: 'star', position: galaxyGlowPointDefs[2 + i].position.clone(),
-            baseSize: 0.52, color: new THREE.Color('#ffffff'), // 0.4 → 0.52: más presencia contra el fondo más luminoso
+            baseSize: 0.4, color: new THREE.Color('#ffffff'),
             baseOpacity: 1.0,
             phase: Math.random() * Math.PI * 2,
             starIndex: i
@@ -6734,10 +6624,6 @@ function initGalaxy() {
     galaxyBackgroundStars.frustumCulled = false;
     galaxyScene.add(galaxyBackgroundStars);
 
-    // MEJORA #4 — NIEBLA/VOLUMEN (ver createGalaxyNebula arriba)
-    galaxyNebulaGroup = createGalaxyNebula(isMobile, isHighEndMobile);
-    galaxyScene.add(galaxyNebulaGroup);
-
     // Mantenemos las 6 estrellas principales interactuables, pero ya NO como
     // Sprite: las capturas mostraron que también sufrían el bug (aunque más
     // disimulado, como un recorte en forma de "D" en vez de un chorro).
@@ -6872,29 +6758,11 @@ function initGalaxy() {
     // primer frame en vez de solo hasta el próximo resize.
     const safeW = Math.max(32, Math.floor(sizes.width / 32) * 32);
     const safeH = Math.max(32, Math.floor(Math.max(sizes.height, GALAXY_BLOOM_MIN_HEIGHT) / 32) * 32);
-    // MEJORA #2 — MÁS LUMINOSIDAD: ahora que confirmamos que el bloom en sí
-    // nunca fue la causa del geíser (era la proyección de los Sprites, ya
-    // migrados a Points), se puede subir sin el mismo riesgo de antes.
-    //   - strength 0.58 → 0.80: glow general más intenso.
-    //   - radius   0.62 → 0.74: el halo se esparce un poco más suave/ancho.
-    //   - threshold 0.42 → 0.33: antes solo el núcleo casi-blanco puro
-    //     disparaba bloom; bajar el umbral deja que los brazos espirales
-    //     dorados/rosados (que ya son bastante brillantes pero no llegaban
-    //     al corte) también empiecen a brillar un poco, así la galaxia se
-    //     siente luminosa en conjunto y no solo el centro.
-    // Son solo números — si al verlo se siente muy fuerte o muy tenue, se
-    // puede afinar sin tocar nada más.
-    // AJUSTE: el 0.80/0.74/0.33 anterior quedaba muy fuerte — los brazos
-    // espirales brillaban tanto que las estrellas clicables perdían
-    // contraste contra el fondo. Punto medio entre el original (0.58/
-    // 0.62/0.42) y ese boost: strength/radius bajan un poco, y threshold
-    // sube de vuelta cerca del original para que solo lo realmente
-    // brillante (núcleo + estrellas) dispare bloom, no los brazos enteros.
     const bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(safeW, safeH),
-        0.66, // Strength
-        0.66, // Radius
-        0.40  // Threshold
+        0.58, // Strength
+        0.62, // Radius
+        0.42  // Threshold
     );
     galaxyComposer = new THREE.EffectComposer(galaxyRenderer);
     galaxyComposer.addPass(renderScene);
@@ -7263,14 +7131,6 @@ function tick() {
             galaxyBackgroundStars.material.uniforms.uTime.value = time;
             // Rotación casi imperceptible para que no se sienta "pegado"
             galaxyBackgroundStars.rotation.y = time * 0.0025;
-        }
-
-        if (galaxyNebulaGroup) {
-            galaxyNebulaGroup.material.uniforms.uTime.value = time;
-            // Deriva propia, más lenta que las estrellas de fondo y en
-            // sentido contrario — refuerza la sensación de profundidad
-            // (capas moviéndose a distinta velocidad/dirección).
-            galaxyNebulaGroup.rotation.y = -time * 0.0012;
         }
 
         if (galaxyStreakField) {
