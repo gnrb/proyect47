@@ -1523,7 +1523,7 @@ function startYellowFire() {
     yellowFireSparks = [];
 
     yellowFireflies = [];
-    for(let i = 0; i < 45; i++) {
+    for(let i = 0; i < 65; i++) {
         yellowFireflies.push({
             x: Math.random() * window.innerWidth,
             y: window.innerHeight - Math.random() * (window.innerHeight * 0.35), // Solo en el 35% inferior
@@ -1621,6 +1621,20 @@ function drawYellowFireParticle(ctx, p, progress) {
 
     ctx.save();
 
+    /* NUEVO: halo ambiental — mucho más grande y tenue que el halo exterior,
+       para que el fuego tiña levemente el aire alrededor y no se sienta como
+       una llama aislada flotando en negro. */
+    const ambientRadius = radiusY * 2.6;
+    const ambientHalo = ctx.createRadialGradient(x, y, 0, x, y, ambientRadius);
+    ambientHalo.addColorStop(0.00, `rgba(255, 150, 40, ${0.018 * fade})`);
+    ambientHalo.addColorStop(0.55, `rgba(255, 110, 20, ${0.010 * fade})`);
+    ambientHalo.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = ambientHalo;
+    ctx.beginPath();
+    ctx.ellipse(x, y, ambientRadius, ambientRadius * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     /* Halo exterior suave: esta es la apariencia antigua realista. */
     const outerGlow = ctx.createRadialGradient(
         x,
@@ -1706,21 +1720,25 @@ function animateYellowFire() {
             }
         }
 
-        if (yellowFireParticles.length > 90) yellowFireParticles.splice(0, yellowFireParticles.length - 90);
-        if (yellowFireSparks.length > 45) yellowFireSparks.splice(0, yellowFireSparks.length - 45);
+        if (yellowFireParticles.length > 130) yellowFireParticles.splice(0, yellowFireParticles.length - 130);
+        if (yellowFireSparks.length > 70) yellowFireSparks.splice(0, yellowFireSparks.length - 70);
 
         const baseX = width / 2;
         const baseY = height * 0.91;
 
-        const baseGlow = ctx.createRadialGradient(baseX, baseY, 0, baseX, baseY, 120 + progress * 90);
-        baseGlow.addColorStop(0, `rgba(255,220,120,${0.05 + progress * 0.08})`);
-        baseGlow.addColorStop(0.28, `rgba(255,165,50,${0.05 + progress * 0.07})`);
-        baseGlow.addColorStop(0.58, `rgba(255,100,20,${0.03 + progress * 0.05})`);
+        // Cuánto "sopla" ahora mismo, 0-1, para que el resplandor de base
+        // respire con las ráfagas en vez de quedarse siempre igual.
+        const windMag = Math.min(Math.hypot(yellowWindX, yellowWindY) * 0.35, 1);
+
+        const baseGlow = ctx.createRadialGradient(baseX, baseY, 0, baseX, baseY, 120 + progress * 90 + windMag * 22);
+        baseGlow.addColorStop(0, `rgba(255,220,120,${(0.05 + progress * 0.08) * (1 + windMag * 0.35)})`);
+        baseGlow.addColorStop(0.28, `rgba(255,165,50,${(0.05 + progress * 0.07) * (1 + windMag * 0.3)})`);
+        baseGlow.addColorStop(0.58, `rgba(255,100,20,${(0.03 + progress * 0.05) * (1 + windMag * 0.25)})`);
         baseGlow.addColorStop(1, 'rgba(0,0,0,0)');
 
         ctx.fillStyle = baseGlow;
         ctx.beginPath();
-        ctx.ellipse(baseX, baseY, 150 + progress * 95, 52 + progress * 40, 0, 0, Math.PI * 2);
+        ctx.ellipse(baseX, baseY, 150 + progress * 95 + windMag * 26, 52 + progress * 40 + windMag * 10, 0, 0, Math.PI * 2);
         ctx.fill();
 
         yellowFireParticles = yellowFireParticles.filter(p => {
@@ -1773,7 +1791,21 @@ function animateYellowFire() {
                     const y = s.y;
 
                     ctx.save();
-                    
+
+                    // MISMO HALO AMBIENTAL que las llamas normales, en azul —
+                    // si no lo espejamos acá, la chispa se distingue por tener
+                    // menos "aura" alrededor que el resto del fuego.
+                    const ambientRadiusBlue = radiusY * 2.6;
+                    const ambientHaloBlue = ctx.createRadialGradient(x, y, 0, x, y, ambientRadiusBlue);
+                    ambientHaloBlue.addColorStop(0.00, `rgba(40, 140, 255, ${0.018 * fade})`);
+                    ambientHaloBlue.addColorStop(0.55, `rgba(20, 100, 255, ${0.010 * fade})`);
+                    ambientHaloBlue.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+
+                    ctx.fillStyle = ambientHaloBlue;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, ambientRadiusBlue, ambientRadiusBlue * 0.85, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
                     // MISMO DESTELLO EXTERIOR (pero en tonos Cyan/Azul)
                     const outerGlow = ctx.createRadialGradient(x, y, 0, x, y, radiusY * 1.6);
                     outerGlow.addColorStop(0.00, `rgba(100, 200, 255, ${0.025 * fade})`);
