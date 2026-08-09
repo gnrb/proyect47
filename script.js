@@ -6087,6 +6087,114 @@ function isHighEndMobileGalaxyDevice() {
     return screenOk && dprOk && cpuOk && memOk;
 }
 
+// ==========================================================================
+// MEJORA #4 — NIEBLA/VOLUMEN
+// ==========================================================================
+// Mismo patrón ya probado sin problemas en el S24 FE: Points + shader
+// propio (gl_PointSize, nada de Sprite, nada de createRadialGradient). La
+// técnica es la clásica "volumen vía muchos sprites suaves acumulados":
+// puntos grandes con opacidad MUY baja cada uno, que al superponerse leen
+// como una niebla continua en vez de puntos individuales — sin necesitar
+// raymarching ni ninguna textura nueva (cero superficie nueva para otro
+// bug raro).
+function createGalaxyNebula(isMobile, isHighEndMobile) {
+    const nebulaCount = isHighEndMobile ? 700 : (isMobile ? 480 : 900);
+    const nebulaGeo = new THREE.BufferGeometry();
+    const nebulaPos = new Float32Array(nebulaCount * 3);
+    const nebulaColor = new Float32Array(nebulaCount * 3);
+    const nebulaSize = new Float32Array(nebulaCount);
+    const nebulaOpacity = new Float32Array(nebulaCount);
+    const nebulaPhase = new Float32Array(nebulaCount);
+
+    // Paleta fría/romántica que complementa el dorado del disco sin
+    // competir con él — violetas, magentas y celestes suaves.
+    const nebulaPalette = [
+        new THREE.Color('#6a4dff'),
+        new THREE.Color('#ff6ec7'),
+        new THREE.Color('#4da6ff'),
+        new THREE.Color('#b06aff'),
+        new THREE.Color('#ff9ecb')
+    ];
+
+    for (let i = 0; i < nebulaCount; i++) {
+        // Distribución aplanada alrededor del disco (más ancha que alta,
+        // como el halo difuso real de una galaxia espiral), empezando un
+        // poco después del núcleo y extendiéndose más allá del borde del
+        // disco (radio ~7) sin llegar al cascarón de estrellas de fondo
+        // (radio 25-55) — ocupa el espacio "vacío" intermedio.
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 3 + Math.pow(Math.random(), 0.6) * 14; // 3 a 17
+        const heightSpread = 1.2 + radius * 0.15;
+        nebulaPos[i * 3 + 0] = Math.cos(angle) * radius;
+        nebulaPos[i * 3 + 1] = (Math.random() - 0.5) * heightSpread;
+        nebulaPos[i * 3 + 2] = Math.sin(angle) * radius;
+
+        const tint = nebulaPalette[Math.floor(Math.random() * nebulaPalette.length)];
+        nebulaColor[i * 3 + 0] = tint.r;
+        nebulaColor[i * 3 + 1] = tint.g;
+        nebulaColor[i * 3 + 2] = tint.b;
+
+        // Grandes para que se solapen bastante (eso es lo que da la
+        // sensación de "volumen" en vez de puntos sueltos) pero cada uno
+        // MUY tenue individualmente.
+        nebulaSize[i] = 4 + Math.random() * 7;
+        nebulaOpacity[i] = 0.02 + Math.random() * 0.035;
+        nebulaPhase[i] = Math.random() * Math.PI * 2;
+    }
+
+    nebulaGeo.setAttribute('position', new THREE.BufferAttribute(nebulaPos, 3));
+    nebulaGeo.setAttribute('aColor', new THREE.BufferAttribute(nebulaColor, 3));
+    nebulaGeo.setAttribute('aSize', new THREE.BufferAttribute(nebulaSize, 1));
+    nebulaGeo.setAttribute('aOpacity', new THREE.BufferAttribute(nebulaOpacity, 1));
+    nebulaGeo.setAttribute('aPhase', new THREE.BufferAttribute(nebulaPhase, 1));
+
+    const nebulaMat = new THREE.ShaderMaterial({
+        uniforms: {
+            uScaleFactor: { value: 600 },
+            uTime: { value: 0 }
+        },
+        vertexShader: `
+            attribute float aSize;
+            attribute float aOpacity;
+            attribute vec3 aColor;
+            attribute float aPhase;
+            uniform float uScaleFactor;
+            uniform float uTime;
+            varying vec3 vColor;
+            varying float vOpacity;
+            void main() {
+                vColor = aColor;
+                // Respiración muy lenta y sutil — evita que la niebla se
+                // sienta "plana"/estática sin llegar a distraer.
+                vOpacity = aOpacity * (0.75 + 0.25 * sin(uTime * 0.12 + aPhase));
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = aSize * (uScaleFactor / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vColor;
+            varying float vOpacity;
+            void main() {
+                vec2 uv = gl_PointCoord - 0.5;
+                float d = length(uv) * 2.0;
+                // Caída bien suave y ancha, sin borde definido — es niebla,
+                // no una estrella puntual.
+                float glow = pow(clamp(1.0 - d, 0.0, 1.0), 2.4);
+                gl_FragColor = vec4(vColor, glow * vOpacity);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.AdditiveBlending
+    });
+
+    const nebula = new THREE.Points(nebulaGeo, nebulaMat);
+    nebula.frustumCulled = false;
+    return nebula;
+}
+
 function createUnifiedGalaxy(parameters, isMobile, isHighEndMobile) {
     const group = new THREE.Group();
 
@@ -6443,7 +6551,7 @@ function initGalaxy() {
         starGlowIndexByStar.push(galaxyGlowPointDefs.length);
         galaxyGlowPointDefs.push({
             kind: 'star', position: galaxyGlowPointDefs[2 + i].position.clone(),
-            baseSize: 0.4, color: new THREE.Color('#ffffff'),
+            baseSize: 0.52, color: new THREE.Color('#ffffff'), // 0.4 → 0.52: más presencia contra el fondo más luminoso
             baseOpacity: 1.0,
             phase: Math.random() * Math.PI * 2,
             starIndex: i
@@ -6626,6 +6734,10 @@ function initGalaxy() {
     galaxyBackgroundStars.frustumCulled = false;
     galaxyScene.add(galaxyBackgroundStars);
 
+    // MEJORA #4 — NIEBLA/VOLUMEN (ver createGalaxyNebula arriba)
+    galaxyNebulaGroup = createGalaxyNebula(isMobile, isHighEndMobile);
+    galaxyScene.add(galaxyNebulaGroup);
+
     // Mantenemos las 6 estrellas principales interactuables, pero ya NO como
     // Sprite: las capturas mostraron que también sufrían el bug (aunque más
     // disimulado, como un recorte en forma de "D" en vez de un chorro).
@@ -6772,11 +6884,17 @@ function initGalaxy() {
     //     siente luminosa en conjunto y no solo el centro.
     // Son solo números — si al verlo se siente muy fuerte o muy tenue, se
     // puede afinar sin tocar nada más.
+    // AJUSTE: el 0.80/0.74/0.33 anterior quedaba muy fuerte — los brazos
+    // espirales brillaban tanto que las estrellas clicables perdían
+    // contraste contra el fondo. Punto medio entre el original (0.58/
+    // 0.62/0.42) y ese boost: strength/radius bajan un poco, y threshold
+    // sube de vuelta cerca del original para que solo lo realmente
+    // brillante (núcleo + estrellas) dispare bloom, no los brazos enteros.
     const bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(safeW, safeH),
-        0.80, // Strength
-        0.74, // Radius
-        0.33  // Threshold
+        0.66, // Strength
+        0.66, // Radius
+        0.40  // Threshold
     );
     galaxyComposer = new THREE.EffectComposer(galaxyRenderer);
     galaxyComposer.addPass(renderScene);
@@ -7145,6 +7263,14 @@ function tick() {
             galaxyBackgroundStars.material.uniforms.uTime.value = time;
             // Rotación casi imperceptible para que no se sienta "pegado"
             galaxyBackgroundStars.rotation.y = time * 0.0025;
+        }
+
+        if (galaxyNebulaGroup) {
+            galaxyNebulaGroup.material.uniforms.uTime.value = time;
+            // Deriva propia, más lenta que las estrellas de fondo y en
+            // sentido contrario — refuerza la sensación de profundidad
+            // (capas moviéndose a distinta velocidad/dirección).
+            galaxyNebulaGroup.rotation.y = -time * 0.0012;
         }
 
         if (galaxyStreakField) {
