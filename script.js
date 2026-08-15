@@ -106,10 +106,10 @@ const EXTRA_TRACKS = {
         artist: "Jaze",
         src: "canciones 1/la terminal - Jaze (FLAC).mp3"
     },
-    "bachata-rosa": {
-        title: "Bachata Rosa",
-        artist: "Juan Luis Guerra",
-        src: "canciones 1/Bachata Rosa - Juan Luis Guerra.mp3"
+    "what-was-i-made-for": {
+        title: "What Was I Made For?",
+        artist: "Billie Eilish",
+        src: "canciones 1/What_Was_I_Made_For.mp3"
     },
     "risk-it-all": {
         title: "Risk it All",
@@ -8995,7 +8995,7 @@ const EXTRA_TRACK_NOTES = {
     "in-the-pool": "Esta la puse porque no todo lo bonito tenia que gritar, aveces basta con una canción tranquila, agua de noche y la sensación rara de querer quedarse un poco más",
     "por-ti": "Esta no necesitaba ser un mundo, solo necesitaba quedarse sonando un rato xd",
     "la-terminal": "Literal, escuhco cuando voy en el transporte y hay lluvia",
-    "bachata-rosa": "Ni yo se porque la puse, solo que me gusto jasja",
+    "what-was-i-made-for": "La vdd que gracias a ti empece a escuchar mas de ella, esta me encanto jasja",
     "sparks": "Quizas sea la cancion que más me recuerda a ti, no se si es por la letra o por el ritmo pero me hace pensar en ti",
     "still-love-you": "Esta no es taaan especial, pero quizas y te guste xd, porque a mi si",
     "sunflower": "Aca se habla de como una persona es algo caotica (en el buen sentido xd) y como a veces es dificil de entender, pero aun asi es hermosa y especial como un girasol",
