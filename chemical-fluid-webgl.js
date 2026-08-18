@@ -521,16 +521,6 @@ class ChemicalFluidSim {
         if (radiusPx) { pond.radiusPx = radiusPx; if (!pond.revealed) pond.targetRadius = radiusPx; }
     }
 
-    getPondClearance(id) {
-        const pond = this.ponds.get(id);
-        return pond ? pond.clearedFraction : 0;
-    }
-
-    isPondRevealed(id) {
-        const pond = this.ponds.get(id);
-        return pond ? pond.revealed : false;
-    }
-
     _addSplatToPonds(xPx, yPx, intensity) {
         // Enlaza el radio lógico a la configuración visual para evitar desajustes
         const brush = this.config.SPLAT_RADIUS_PX * 1.5; 
