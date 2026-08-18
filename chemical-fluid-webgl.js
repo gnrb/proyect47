@@ -24,15 +24,15 @@ class ChemicalFluidSim {
             PRESSURE_DISSIPATION: 0.9,
             PRESSURE_ITERATIONS: this.isMobile ? 14 : 22,
             CURL: this.isMobile ? 20 : 30,
-            SPLAT_RADIUS_PX: this.isMobile ? 22 : 30,
+            SPLAT_RADIUS_PX: this.isMobile ? 25 : 30,
             SPLAT_FORCE: 4800,                        
             BASE_OPACITY: 0.96,
             MAX_PONDS: 4,
             POND_GRID_SIZE: 7,
             
             // --- AJUSTES DE DIFICULTAD EQUILIBRADOS ---
-            CELL_CLEAR_THRESHOLD: this.isMobile ? 0.50 : 0.45, // PC bajó a 0.45 (antes estaba muy duro en 0.65)
-            REVEAL_FRACTION: this.isMobile ? 0.78 : 0.75,      // PC bajó a 0.75 (ya no pide el 85%)
+            CELL_CLEAR_THRESHOLD: this.isMobile ? 0.47 : 0.45, // Móvil ligeramente suavizado (antes 0.50): con el dedo cuesta más precisión que con mouse
+            REVEAL_FRACTION: this.isMobile ? 0.74 : 0.75,      // Móvil ligeramente suavizado (antes 0.78)
             POND_DECAY_PER_SEC: 0.25,                          // El líquido da un pequeño respiro antes de tapar de nuevo
             REVEAL_SHRINK_SECONDS: 1.1
         };
