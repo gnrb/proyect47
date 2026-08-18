@@ -925,13 +925,23 @@ function goBack() {
         console.error("Previniendo cuelgue de pantalla negra:", e);
     }
 
-    if (currentWorld === 2) stopChemicalFluid();
+    const wasWorld2 = currentWorld === 2;
+    if (wasWorld2) stopChemicalFluid();
 
     menuScreen.classList.remove('hidden');
     menuScreen.classList.add('active');
     
     currentWorld = 0;
     updateVisitedCounter();
+
+    // Reinicio del Mundo 2 al salir: polaroids principales, clímax y frases
+    // vuelven a su estado inicial para la próxima visita. El polaroid del
+    // error queda excluido a propósito (prepareWorld2InitialState ya
+    // respeta ese caso vía world2SecretAlreadyFound), así que una vez
+    // encontrado no vuelve a esconderse.
+    if (wasWorld2 && typeof prepareWorld2InitialState === 'function') {
+        prepareWorld2InitialState({ force: true });
+    }
 
     clearTimeout(world3IntroTimer);
     
@@ -8995,7 +9005,7 @@ const EXTRA_TRACK_NOTES = {
     "in-the-pool": "Esta la puse porque no todo lo bonito tenia que gritar, aveces basta con una canción tranquila, agua de noche y la sensación rara de querer quedarse un poco más",
     "por-ti": "Esta no necesitaba ser un mundo, solo necesitaba quedarse sonando un rato xd",
     "la-terminal": "Literal, escuhco cuando voy en el transporte y hay lluvia",
-    "what-was-i-made-for": "La vdd que gracias a ti empece a escuchar mas de ella, esta me encanto jasja",
+    "what-was-i-made-for": "Ni yo se porque la puse, solo que me gusto jasja",
     "sparks": "Quizas sea la cancion que más me recuerda a ti, no se si es por la letra o por el ritmo pero me hace pensar en ti",
     "still-love-you": "Esta no es taaan especial, pero quizas y te guste xd, porque a mi si",
     "sunflower": "Aca se habla de como una persona es algo caotica (en el buen sentido xd) y como a veces es dificil de entender, pero aun asi es hermosa y especial como un girasol",
