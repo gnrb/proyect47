@@ -6481,6 +6481,56 @@ function updateGalaxyCameraFraming() {
     }
 }
 
+// ==========================================================================
+// RECUPERACIÓN DE PÉRDIDA DE CONTEXTO WEBGL
+// iOS Safari (y, más raro, Android con poca RAM) puede matar el contexto
+// WebGL bajo presión de memoria sin avisar. Sin esto, el canvas queda
+// congelado en su último frame para siempre, sin ningún error visible ni
+// forma de recuperarse: exactamente el "se quedó pegado" que reportaron.
+// Esto NO evita que el contexto se pierda (eso no se puede controlar desde
+// JS), solo asegura que en vez de un congelamiento mudo, la persona vea un
+// mensaje claro con un botón para recargar y seguir donde lo dejó.
+// ==========================================================================
+function attachWebGLContextLossRecovery(canvas, label) {
+    if (!canvas || canvas.dataset.contextLossHandlerAttached === 'true') return;
+    canvas.dataset.contextLossHandlerAttached = 'true';
+
+    canvas.addEventListener('webglcontextlost', (event) => {
+        // preventDefault() le dice al navegador que nosotros nos encargamos;
+        // sin esto, en algunos navegadores ni siquiera llega a dispararse
+        // 'webglcontextrestored' más adelante.
+        event.preventDefault();
+        console.warn(`[WebGL] Contexto perdido en: ${label}`);
+        showWebGLCrashOverlay();
+    }, false);
+
+    canvas.addEventListener('webglcontextrestored', () => {
+        console.warn(`[WebGL] Contexto restaurado en: ${label} (se sigue recomendando recargar, las escenas 3D no se re-inicializan solas)`);
+    }, false);
+}
+
+function showWebGLCrashOverlay() {
+    if (document.getElementById('webgl-crash-overlay')) return; // ya está visible, no duplicar
+
+    const overlay = document.createElement('div');
+    overlay.id = 'webgl-crash-overlay';
+    overlay.innerHTML = `
+        <div class="webgl-crash-box">
+            <p>Ups, algo se saturó 💫</p>
+            <p class="webgl-crash-sub">Toca para recargar y seguir donde lo dejaste.</p>
+            <button type="button" class="webgl-crash-btn">Recargar</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const reload = () => window.location.reload();
+    overlay.querySelector('.webgl-crash-btn').addEventListener('click', reload);
+    // También se puede tocar en cualquier parte del fondo, no solo el botón
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) reload();
+    });
+}
+
 function initGalaxy() {
     if (galaxyInitialized) return; 
     
@@ -6846,6 +6896,7 @@ function initGalaxy() {
     // FIX DE GPU AMD/EXYNOS: Apagamos el antialias y el premultipliedAlpha nativo 
     // porque entran en conflicto con el post-procesamiento en celulares de gama alta
     galaxyRenderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: false, premultipliedAlpha: false });
+    attachWebGLContextLossRecovery(canvas, 'World 1 - Galaxia');
     galaxyRenderer.setSize(sizes.width, sizes.height);
     galaxyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
 
@@ -8014,6 +8065,7 @@ function initChemicalFluid() {
     if (!fluidCanvas) return;
 
     if (!chemicalFluidSim) {
+        attachWebGLContextLossRecovery(fluidCanvas, 'World 2 - Fluido');
         chemicalFluidSim = new window.ChemicalFluidSim(fluidCanvas, {
             isActive: () => currentWorld === 2,
             getSize: () => getAppSize(),
