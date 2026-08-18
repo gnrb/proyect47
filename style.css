@@ -14602,3 +14602,70 @@ body.fullscreen-unavailable .mobile-orientation-actions button[data-mobile-fulls
         text-shadow: 0 2px 6px rgba(0,0,0,0.9) !important;
     }
 }
+
+/* ==========================================================================
+   RECUPERACIÓN DE PÉRDIDA DE CONTEXTO WEBGL
+   Overlay que se muestra si el navegador mata el contexto WebGL (más común
+   en iOS Safari bajo presión de memoria, pero puede pasar en cualquier
+   navegador). Antes de esto no había ningún manejo -> pantalla congelada
+   para siempre sin ningún aviso.
+   ========================================================================== */
+#webgl-crash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999999; /* por encima de absolutamente todo lo demás */
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: webglCrashFadeIn 0.35s ease-out;
+}
+
+@keyframes webglCrashFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.webgl-crash-box {
+    max-width: 340px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.webgl-crash-box p {
+    margin: 0;
+    font-size: clamp(15px, 4.2vw, 18px);
+    font-weight: 600;
+    color: #fff;
+}
+
+.webgl-crash-sub {
+    font-weight: 400 !important;
+    font-size: clamp(12px, 3.4vw, 14px) !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+    margin-bottom: 8px !important;
+}
+
+.webgl-crash-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    padding: 12px 26px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 24px;
+    cursor: pointer;
+    min-height: 44px; /* iOS tap target minimum */
+    transition: 0.2s;
+}
+
+.webgl-crash-btn:active,
+.webgl-crash-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
