@@ -812,6 +812,43 @@ class ChemicalFluidSim {
         if (this._rafId != null) cancelAnimationFrame(this._rafId);
         this._rafId = null;
     }
+
+    // ======================================================================
+    // LIBERAR MEMORIA DE GPU AL SALIR DEL MUNDO 2
+    // resetFluid() (arriba) solo BORRA el contenido de los framebuffers que
+    // ya existen — la memoria de video que ocupan (texturas, FBOs de wipe,
+    // velocity, dye, pressure, divergence, curl) se queda reservada todo el
+    // tiempo, esté o no la persona en este mundo. En iPhone eso suma a la
+    // presión de memoria que puede hacer que iOS mate el contexto WebGL.
+    //
+    // WEBGL_lose_context es el mecanismo que el propio estándar de WebGL
+    // define para esto: en vez de tener que borrar a mano cada textura y
+    // framebuffer uno por uno (con el riesgo de olvidar alguno), le pide al
+    // driver que libere TODO lo asociado a este contexto de una sola vez.
+    //
+    // Como prepareWorld2InitialState() ya reconstruye todo el estado visual
+    // (polaroids, QR, frases) cada vez que se re-entra al mundo 2, y
+    // initChemicalFluid() ya tiene el guard "if (!chemicalFluidSim)" para
+    // crear una instancia nueva si no existe, dejar chemicalFluidSim = null
+    // después de este dispose hace que la próxima vez que se entre al mundo
+    // 2 se cree un simulador 100% nuevo — mismo resultado visual de siempre
+    // ("se reinicia todo"), pero sin cargar con la memoria del anterior.
+    // ======================================================================
+    dispose() {
+        this.stop();
+        if (this.gl) {
+            // Marcamos el canvas para que el listener de recuperación de
+            // contexto (en script.js) sepa que esta pérdida de contexto es
+            // intencional y no muestre el aviso de "algo se saturó".
+            if (this.canvas) this.canvas.dataset.intentionalContextLoss = 'true';
+
+            const loseCtx = this.gl.getExtension('WEBGL_lose_context');
+            if (loseCtx) loseCtx.loseContext();
+        }
+        this.gl = null;
+        this.programs = null;
+        this.ponds.clear();
+    }
 }
 
 window.ChemicalFluidSim = ChemicalFluidSim;
