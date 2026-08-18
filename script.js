@@ -6500,6 +6500,15 @@ function attachWebGLContextLossRecovery(canvas, label) {
         // sin esto, en algunos navegadores ni siquiera llega a dispararse
         // 'webglcontextrestored' más adelante.
         event.preventDefault();
+
+        // Si esta pérdida de contexto la provocamos nosotros a propósito
+        // (ej. ChemicalFluidSim.dispose() al salir del mundo 2 para liberar
+        // memoria), no es un error: no mostramos el aviso.
+        if (canvas.dataset.intentionalContextLoss === 'true') {
+            canvas.dataset.intentionalContextLoss = 'false';
+            return;
+        }
+
         console.warn(`[WebGL] Contexto perdido en: ${label}`);
         showWebGLCrashOverlay();
     }, false);
@@ -6898,7 +6907,14 @@ function initGalaxy() {
     galaxyRenderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: false, premultipliedAlpha: false });
     attachWebGLContextLossRecovery(canvas, 'World 1 - Galaxia');
     galaxyRenderer.setSize(sizes.width, sizes.height);
-    galaxyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.5));
+    // Tope de pixel ratio más bajo en mobile (mismo patrón que ya usa
+    // chemical-fluid-webgl.js): en un iPhone con densidad 3x esto baja ~36%
+    // los píxeles que maneja el renderer + el post-procesado de bloom, que
+    // es el mayor consumidor de VRAM de todo el proyecto. Sin esto, cada
+    // buffer interno del EffectComposer (incluyendo la cadena de mips del
+    // bloom) se crea más grande de lo necesario en los celulares donde más
+    // importa cuidar la memoria.
+    galaxyRenderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 2 : 2.5));
 
     galaxyRenderer.toneMapping = THREE.ACESFilmicToneMapping;
     galaxyRenderer.toneMappingExposure = 1.15;
@@ -8079,19 +8095,41 @@ function initChemicalFluid() {
             console.warn('[ChemicalFluidSim] WebGL no disponible; el cuarto oscuro seguirá funcionando sin el líquido.');
             return;
         }
-
-        window.addEventListener('resize', () => {
-            if (currentWorld === 2) repositionWorld2Ponds();
-        });
     }
+
+    // Fuera del "if (!chemicalFluidSim)" a propósito: como ahora chemicalFluidSim
+    // se puede recrear varias veces por sesión (ver stopChemicalFluid), este
+    // listener debe registrarse UNA sola vez en total, no una vez por cada
+    // recreación (si no, se acumulan listeners de resize duplicados para
+    // siempre — la misma clase de fuga que estamos intentando evitar).
+    bindWorld2ResizeListener();
 
     bindWorld2FluidAgitation();
     if (currentWorld === 2) chemicalFluidSim.start();
 }
 
+let world2ResizeListenerBound = false;
+function bindWorld2ResizeListener() {
+    if (world2ResizeListenerBound) return;
+    world2ResizeListenerBound = true;
+
+    window.addEventListener('resize', () => {
+        if (currentWorld === 2) repositionWorld2Ponds();
+    });
+}
+
 // Se llama al salir del Mundo 2 (o al ocultarlo) para detener el loop de render y ahorrar batería.
 function stopChemicalFluid() {
-    if (chemicalFluidSim) chemicalFluidSim.stop();
+    if (!chemicalFluidSim) return;
+
+    // dispose() libera la memoria de GPU (texturas/FBOs); dejarlo en null
+    // hace que initChemicalFluid() cree una instancia 100% nueva la próxima
+    // vez que se entre al mundo 2 — mismo comportamiento de "todo se
+    // reinicia" que ya existe hoy vía prepareWorld2InitialState(), solo que
+    // ahora también se libera la memoria en vez de quedar reservada para
+    // siempre en segundo plano.
+    chemicalFluidSim.dispose();
+    chemicalFluidSim = null;
 }
 
 // Punto de integración: misma firma de siempre.
