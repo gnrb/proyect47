@@ -6096,107 +6096,6 @@ function createGalaxyStreakField(parameters, isMobile = false, isHighEndMobile =
 }
 
 
-// ======================================================
-// NUBES / NEBULOSAS REALISTAS PARA EL MUNDO 1
-// Son pocas sprites grandes con textura procedural: se ve más denso sin matar FPS.
-// ======================================================
-function createSoftCloudTexture(options = {}) {
-    const {
-        size = 256,
-        coreAlpha = 0.72,
-        midAlpha = 0.24,
-        edgeAlpha = 0.0,
-        noise = true,
-        cells = 38,
-        cavities = 20
-    } = options;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, size, size);
-
-    const cx = size * 0.5;
-    const cy = size * 0.5;
-
-    // Base suave, pero con caída lenta para que parezca gas y no círculo sólido.
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.54);
-    gradient.addColorStop(0.00, `rgba(255,255,255,${coreAlpha})`);
-    gradient.addColorStop(0.18, `rgba(255,255,255,${midAlpha})`);
-    gradient.addColorStop(0.46, 'rgba(255,255,255,0.115)');
-    gradient.addColorStop(0.72, 'rgba(255,255,255,0.035)');
-    gradient.addColorStop(1.00, `rgba(255,255,255,${edgeAlpha})`);
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
-
-    // Parches de gas: rompe la forma circular y crea volumen orgánico.
-    ctx.globalCompositeOperation = 'screen';
-    for (let i = 0; i < cells; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.pow(Math.random(), 0.85) * size * 0.32;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-        const r = size * (0.045 + Math.random() * 0.19);
-        const a = 0.018 + Math.random() * 0.05;
-
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, `rgba(255,255,255,${a})`);
-        g.addColorStop(0.55, `rgba(255,255,255,${a * 0.35})`);
-        g.addColorStop(1, 'rgba(255,255,255,0)');
-
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Cavidades oscuras: evita que la nebulosa se vea como sticker.
-    ctx.globalCompositeOperation = 'destination-out';
-    for (let i = 0; i < cavities; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.pow(Math.random(), 0.75) * size * 0.38;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-        const r = size * (0.035 + Math.random() * 0.13);
-        const a = 0.035 + Math.random() * 0.10;
-
-        const cut = ctx.createRadialGradient(x, y, 0, x, y, r);
-        cut.addColorStop(0, `rgba(255,255,255,${a})`);
-        cut.addColorStop(1, 'rgba(255,255,255,0)');
-
-        ctx.fillStyle = cut;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Alpha noise barato: textura menos plástica, sin subir geometría.
-    if (noise) {
-        ctx.globalCompositeOperation = 'destination-in';
-        const image = ctx.getImageData(0, 0, size, size);
-        const data = image.data;
-        for (let i = 0; i < data.length; i += 4) {
-            const px = (i / 4) % size;
-            const py = Math.floor((i / 4) / size);
-            const soft = 0.90 + 0.10 * Math.sin(px * 0.09) * Math.cos(py * 0.075);
-            const grain = 0.82 + Math.random() * 0.25;
-            data[i + 3] = Math.min(255, data[i + 3] * soft * grain);
-        }
-        ctx.putImageData(image, 0, 0);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
-    texture.needsUpdate = true;
-    return texture;
-}
-
-
 let neutrinoBreeze = null;
 let neutrinosTriggered = false;
 
@@ -7909,23 +7808,6 @@ function updateWorld2Gradient(current = 0, duration = 0) {
     if (chemicalFluidSim) {
         chemicalFluidSim.setWarmth(warm);
     }
-}
-
-function spawnCustomWhisper(text) {
-    const world2 = document.getElementById('world-2');
-    if (!world2 || currentWorld !== 2 || world2ClimaxTriggered) return;
-
-    const whisper = document.createElement('span');
-    whisper.className = 'floating-whisper whisper-golden';
-    whisper.textContent = text;
-    
-    // Lo centramos en pantalla para que el jugador lo vea
-    whisper.style.top = `${35 + Math.random() * 20}%`;
-    whisper.style.left = `${30 + Math.random() * 40}%`;
-    whisper.style.setProperty('--whisper-rot', `${(Math.random() - 0.5) * 10}deg`);
-
-    world2.appendChild(whisper);
-    whisper.addEventListener('animationend', () => whisper.remove(), { once: true });
 }
 
 function shakeLockedPolaroid(el) {
@@ -9813,6 +9695,22 @@ function canUseFullscreen() {
     );
 }
 
+// iPhone/iPad en Safari (no instalada como app) no soportan la Fullscreen
+// API para elementos normales — es una restricción del sistema, no un bug
+// nuestro. navigator.platform === 'MacIntel' + maxTouchPoints cubre iPadOS
+// 13+, que se reporta a sí mismo como "Mac" en el user agent.
+function isIOS() {
+    return /iP(hone|od|ad)/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// true cuando ya se abrió como app instalada desde la pantalla de inicio
+// (ahí sí se ve sin barra de Safari, aunque canUseFullscreen() siga en false)
+function isRunningStandalone() {
+    return window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+}
+
 async function enterFullscreenSafely() {
     try {
         await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
@@ -9914,6 +9812,11 @@ function updateMobileOrientationNotice() {
     const fullscreenBtn = notice.querySelector('[data-mobile-fullscreen]');
     if (fullscreenBtn) {
         fullscreenBtn.hidden = !canUseFullscreen();
+    }
+
+    const iosHint = document.getElementById('ios-fullscreen-hint');
+    if (iosHint) {
+        iosHint.hidden = !(isIOS() && !canUseFullscreen() && !isRunningStandalone());
     }
 }
 
