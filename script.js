@@ -6151,10 +6151,22 @@ function createUnifiedGalaxy(parameters, isMobile, isHighEndMobile) {
             const radius = Math.random() * parameters.radius;
             const spinAngle = radius * parameters.spin;
             const branchAngle = ((i % parameters.branches) / parameters.branches) * Math.PI * 2;
-            const angle = branchAngle + spinAngle;
 
-           const px = Math.cos(branchAngle + spinAngle) * radius;
-            const pz = Math.sin(branchAngle + spinAngle) * radius;
+            // FIX NÚCLEO (mismo que ya está documentado y probado en
+            // galaxy-physics-webgl.js): sin esto, cerca de radius≈0 el
+            // ángulo de cada partícula depende solo de "branchAngle" (uno
+            // de "parameters.branches" valores fijos), así que miles de
+            // partículas quedan apiladas en esos mismos ángulos justo donde
+            // la densidad es más alta — eso es el molinillo/aspa que se ve
+            // en el núcleo. Igual que allá, dispersamos el ángulo con más
+            // fuerza cerca del centro y la apagamos rápido hacia afuera,
+            // así los brazos espirales de más lejos no se alteran.
+            const coreJitterFalloff = Math.exp(-radius * 1.4);
+            const angleJitter = (Math.random() - 0.5) * Math.PI * 2 * coreJitterFalloff;
+            const angle = branchAngle + spinAngle + angleJitter;
+
+            const px = Math.cos(angle) * radius;
+            const pz = Math.sin(angle) * radius;
             
             // Grosor base de los brazos (los hacemos más finos para que el núcleo destaque)
             const flatten = isDust ? 0.25 : 0.1;
