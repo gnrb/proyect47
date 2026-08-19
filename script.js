@@ -6995,7 +6995,11 @@ function initGalaxy() {
             varying float vAlpha;
             void main() {
                 vColor = color;
-                vAlpha = 0.8 + 1.2 * sin(uTime * 4.0 + position.x * 16.0 + position.y * 11.0);
+                // Con blending aditivo, un alfa negativo no se ve "invisible":
+                // resta luz de lo que hay detrás (un parpadeo hacia oscuro en
+                // vez de hacia transparente). "0.8 + 1.2*sin(...)" podía bajar
+                // hasta -0.4, así que lo acotamos a 0 como mínimo.
+                vAlpha = max(0.0, 0.8 + 1.2 * sin(uTime * 4.0 + position.x * 16.0 + position.y * 11.0));
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                 gl_PointSize = uSize * (1.0 / -mvPosition.z);
                 gl_Position = projectionMatrix * mvPosition;
@@ -7207,6 +7211,8 @@ function hideValeskaAsteroidReveal() {
 }
 
 const _tmpVecStar = new THREE.Vector3();
+let galaxyBreatheX = 0;
+let galaxyBreatheY = 0;
 
 function tick() {
     if (currentWorld === 1) {
@@ -7223,11 +7229,7 @@ function tick() {
             });
         }
         
-        galaxyCamera.position.y += Math.sin(time * 0.5) * 0.003;
-        galaxyCamera.position.x += Math.cos(time * 0.3) * 0.002;
-        galaxyCamera.position.y += Math.sin(time * 0.5) * 0.003;
-        galaxyCamera.position.x += Math.cos(time * 0.3) * 0.002;
-
+        
         if (nearDustParticles) {
             nearDustParticles.rotation.y = time * 0.02;
             nearDustParticles.rotation.x = time * 0.01;
@@ -7331,7 +7333,23 @@ function tick() {
         updateGalaxyLyricConstellations(audio.currentTime || 0, time);
         updateGalaxyFlightMovement();
 
+        // Deshacemos el "respiro" que agregamos el frame anterior ANTES de
+        // que OrbitControls recalcule su radio/ángulo interno a partir de
+        // la posición actual — si no, cada empujoncito del respiro queda
+        // "grabado" como si fuera parte real de tu órbita, y con el tiempo
+        // el encuadre se va desviando poco a poco. Esto es lo que hacía que
+        // la navegación se sintiera descontrolada por momentos en sesiones
+        // largas, tanto en PC como en celular.
+        galaxyCamera.position.x -= galaxyBreatheX;
+        galaxyCamera.position.y -= galaxyBreatheY;
+
         galaxyControls.update();
+
+        galaxyBreatheY = Math.sin(time * 0.5) * 0.003;
+        galaxyBreatheX = Math.cos(time * 0.3) * 0.002;
+        galaxyCamera.position.y += galaxyBreatheY;
+        galaxyCamera.position.x += galaxyBreatheX;
+
         galaxyComposer.render();
 
         const sizes = getAppSize();
